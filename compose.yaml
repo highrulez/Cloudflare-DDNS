@@ -58,6 +58,10 @@ services:
     init: true
     security_opt:
       - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/node
     healthcheck:
       test:
         [
@@ -88,7 +92,17 @@ services:
     init: true
     security_opt:
       - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /home/node
     stop_grace_period: 30s
+    healthcheck:
+      test: ['CMD', 'node', '-e', "require('node:fs').accessSync('/tmp/infra-hub-worker-ready')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     networks:
       - backend
 

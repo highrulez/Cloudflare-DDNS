@@ -26,21 +26,19 @@ RUN DATABASE_URL="mysql://prisma_build:prisma_build@127.0.0.1:3306/prisma_build"
 FROM node:24-bookworm-slim AS runtime
 
 ENV NODE_ENV=production
-ENV PNPM_HOME=/pnpm
-ENV PATH=$PNPM_HOME:$PATH
-RUN corepack enable
+ENV HOME=/home/node
+ENV TMPDIR=/tmp
 
 WORKDIR /app
-COPY --from=build --chown=node:node /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
-COPY --from=build --chown=node:node /app/node_modules ./node_modules
-COPY --from=build --chown=node:node /app/packages/database ./packages/database
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/packages/database ./packages/database
 USER node
 
 FROM runtime AS api
-COPY --from=build --chown=node:node /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --chmod=755 docker/start-api.sh /usr/local/bin/start-api
 CMD ["/usr/local/bin/start-api"]
 
 FROM runtime AS worker
-COPY --from=build --chown=node:node /app/apps/worker/dist ./apps/worker/dist
-CMD ["node", "apps/worker/dist/index.js"]
+COPY --from=build /app/apps/worker/dist ./apps/worker/dist
+CMD ["node", "/app/apps/worker/dist/index.js"]

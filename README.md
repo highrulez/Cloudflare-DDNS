@@ -37,6 +37,8 @@ The default Compose project creates only the web, API, worker, and Redis service
 
 Image builds do not contact MariaDB. Prisma Client is generated with a non-production placeholder URL because Prisma validates configuration while generating; the placeholder is scoped to the build command and is not present in the runtime image. Migrations run only from the API startup script using the runtime `DATABASE_URL`.
 
+Production containers run precompiled Node artifacts as a non-root user with `/app` read-only. The API executes the Prisma CLI directly from dependencies installed in the image; pnpm, Corepack, and package installation are not used during startup.
+
 See [Synology deployment](docs/synology.md) for MariaDB permissions, Container Manager instructions, startup behavior, backups, and troubleshooting.
 
 ## Local development

@@ -1,6 +1,6 @@
 import { Queue, Worker, type Job } from 'bullmq';
 import { Redis } from 'ioredis';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { config as loadDotenv } from 'dotenv';
 import { prisma, type Prisma } from '@infra-hub/database';
@@ -26,6 +26,8 @@ const envFile = [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.
 );
 if (envFile) loadDotenv({ path: envFile, quiet: true });
 const config = loadWorkerConfig();
+const workerHealthFile = process.env.WORKER_HEALTH_FILE ?? '/tmp/infra-hub-worker-ready';
+rmSync(workerHealthFile, { force: true });
 const connection = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
 const schedulerConnection = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
 const cacheConnection = new Redis(config.REDIS_URL);
@@ -363,6 +365,7 @@ async function configureScheduler(): Promise<Queue> {
 }
 
 const systemQueue = await configureScheduler();
+writeFileSync(workerHealthFile, new Date().toISOString(), { encoding: 'utf8' });
 
 for (const worker of [dnsWorker, systemWorker]) {
   worker.on('failed', (job, error) => {
@@ -371,6 +374,7 @@ for (const worker of [dnsWorker, systemWorker]) {
 }
 
 async function shutdown(): Promise<void> {
+  rmSync(workerHealthFile, { force: true });
   await Promise.all([dnsWorker.close(), systemWorker.close(), systemQueue.close()]);
   await Promise.all([
     connection.quit(),

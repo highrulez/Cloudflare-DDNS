@@ -81,7 +81,12 @@ Startup order is automatic:
 4. Prisma applies pending migrations to `infrahub`.
 5. The API creates the first administrator only when no administrator exists.
 6. The API becomes healthy.
-7. The worker and web dashboard start.
+7. The worker starts its prebuilt Node artifact and reports healthy after its BullMQ consumers and scheduler initialize.
+8. The web dashboard starts after API health succeeds.
+
+The runtime images contain the generated Prisma Client, Prisma CLI, migrations, and compiled API/worker artifacts. They run as the unprivileged `node` user with `/app` read-only. Only `/tmp` and `/home/node` are writable temporary filesystems.
+
+The API startup script performs a dedicated MariaDB connectivity check before migration. Connectivity errors such as refusal, authentication failure, missing database, and timeout are logged directly and retried. Once connectivity succeeds, Prisma CLI is executed directly from the installed image dependencies; migration or tooling failures are reported separately and stop startup instead of being mislabeled as database availability failures. No package manager or package installation runs during container startup.
 
 Open:
 

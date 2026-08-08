@@ -152,10 +152,12 @@ importers:
       '@prisma/client':
         specifier: ^7.9.1
         version: 7.9.1(prisma@7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(typescript@6.0.3)
-    devDependencies:
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
+      mariadb:
+        specifier: ^3.5.3
+        version: 3.5.3
       prisma:
         specifier: ^7.9.1
         version: 7.9.1(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3)
@@ -3249,6 +3251,13 @@ packages:
       }
     engines: { node: '>= 14' }
 
+  mariadb@3.5.3:
+    resolution:
+      {
+        integrity: sha512-i053Kc0MgdUv/hu9mCyq67TYfPXFj3/MV8I7ZW5wvJNixIyXC0VztMPUjIVj/449nQo+BsxFD4Fdk/sA/uqKPQ==
+      }
+    engines: { node: '>= 20.0.0' }
+
   mdn-data@2.27.1:
     resolution:
       {
@@ -5970,6 +5979,14 @@ snapshots:
       denque: 2.1.0
       iconv-lite: 0.6.3
       lru-cache: 10.4.3
+
+  mariadb@3.5.3:
+    dependencies:
+      '@types/geojson': 7946.0.16
+      '@types/node': 26.1.2
+      denque: 2.1.0
+      iconv-lite: 0.7.3
+      lru-cache: 11.5.2
 
   mdn-data@2.27.1: {}
 
