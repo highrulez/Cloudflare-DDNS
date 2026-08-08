@@ -39,6 +39,13 @@ Image builds do not contact MariaDB. Prisma Client is generated with a non-produ
 
 Production containers run precompiled Node artifacts as a non-root user with `/app` read-only. The API executes the Prisma CLI directly from dependencies installed in the image; pnpm, Corepack, and package installation are not used during startup.
 
+The canonical readiness endpoint is `GET /health/ready`. After deployment, run the real
+authentication smoke test inside the API container:
+
+```sh
+docker compose exec api node /app/smoke-auth.mjs
+```
+
 See [Synology deployment](docs/synology.md) for MariaDB permissions, Container Manager instructions, startup behavior, backups, and troubleshooting.
 
 ## Local development

@@ -109,6 +109,8 @@ const runtimeConfigShape = {
   APP_ENCRYPTION_KEY_VERSION: z.coerce.number().int().positive().default(1),
   CLOUDFLARE_API_BASE: z.string().url().default('https://api.cloudflare.com/client/v4'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  REDIS_CONNECT_TIMEOUT_MS: z.coerce.number().int().min(500).max(30_000).default(5_000),
+  REDIS_COMMAND_TIMEOUT_MS: z.coerce.number().int().min(500).max(30_000).default(3_000),
   IP_OBSERVATION_CRON: z.string().default('*/5 * * * *'),
   PUBLIC_IPV4_URL: z.string().url().default('https://api.ipify.org'),
   PUBLIC_IPV6_URL: z.string().url().default('https://api6.ipify.org')
@@ -131,6 +133,9 @@ export const appConfigSchema = z
     COOKIE_SAME_SITE: z.enum(['strict', 'lax', 'none']).default('lax'),
     COOKIE_DOMAIN: z.string().min(1).optional(),
     SESSION_TTL_SECONDS: z.coerce.number().int().min(300).max(2_592_000).default(86_400),
+    DATABASE_OPERATION_TIMEOUT_MS: z.coerce.number().int().min(500).max(30_000).default(5_000),
+    AUTH_PASSWORD_VERIFY_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(60_000).default(15_000),
+    AUTH_LOGIN_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(60_000).default(25_000),
     API_HOST: z.string().default('0.0.0.0'),
     API_PORT: z.coerce.number().int().min(1).max(65_535).default(3001),
     ALLOWED_ORIGINS: z

@@ -2,7 +2,7 @@ import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
-import { hash, verify, argon2id } from 'argon2';
+import { hash, verify, needsRehash, argon2id } from 'argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -35,9 +35,17 @@ const envFile = [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.
 );
 if (envFile) loadDotenv({ path: envFile, quiet: true });
 const config = loadConfig();
-const redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
-const dnsQueue = new Queue<ConnectionJob>(QUEUES.dns, { connection: redis });
-const systemQueue = new Queue(QUEUES.system, { connection: redis });
+const redisOptions = {
+  connectTimeout: config.REDIS_CONNECT_TIMEOUT_MS,
+  commandTimeout: config.REDIS_COMMAND_TIMEOUT_MS,
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  retryStrategy: (attempt: number) => Math.min(attempt * 200, 2_000)
+} as const;
+const redis = new Redis(config.REDIS_URL, redisOptions);
+const queueRedis = new Redis(config.REDIS_URL, redisOptions);
+const dnsQueue = new Queue<ConnectionJob>(QUEUES.dns, { connection: queueRedis });
+const systemQueue = new Queue(QUEUES.system, { connection: queueRedis });
 const providers = createProviderRegistry(config.CLOUDFLARE_API_BASE);
 const SESSION_PREFIX = 'infra-hub:session:';
 const DASHBOARD_CACHE_PREFIX = 'infra-hub:dashboard:';
@@ -46,6 +54,7 @@ declare module 'fastify' {
   interface FastifyRequest {
     sessionUser?: SessionUser;
     sessionToken?: string;
+    loginReceivedAt?: number;
   }
 }
 
@@ -56,6 +65,58 @@ class HttpError extends Error {
     message: string
   ) {
     super(message);
+  }
+}
+
+async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+  dependency: string
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new HttpError(
+                503,
+                'DEPENDENCY_TIMEOUT',
+                `${dependency} did not respond within ${timeoutMs}ms`
+              )
+            ),
+          timeoutMs
+        );
+      })
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+async function loginStage<T>(
+  request: FastifyRequest,
+  event: string,
+  operation: () => Promise<T>,
+  timeoutMs?: number
+): Promise<T> {
+  const startedAt = performance.now();
+  request.log.info({ event }, `${event}.start`);
+  try {
+    const result = await (timeoutMs ? withTimeout(operation(), timeoutMs, event) : operation());
+    request.log.info(
+      { event, durationMs: Math.round(performance.now() - startedAt) },
+      `${event}.complete`
+    );
+    return result;
+  } catch (error) {
+    request.log.error(
+      { event, durationMs: Math.round(performance.now() - startedAt), err: error },
+      `${event}.failed`
+    );
+    throw error;
   }
 }
 
@@ -71,8 +132,14 @@ function dashboardCacheKey(userId: string): string {
   return `${DASHBOARD_CACHE_PREFIX}${userId}`;
 }
 
-async function createSession(user: { id: string; sessionVersion: number }): Promise<string> {
-  const token = randomBytes(32).toString('base64url');
+function createSessionToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+async function writeSession(
+  token: string,
+  user: { id: string; sessionVersion: number }
+): Promise<void> {
   await redis.set(
     sessionKey(token),
     JSON.stringify({
@@ -82,13 +149,16 @@ async function createSession(user: { id: string; sessionVersion: number }): Prom
     'EX',
     config.SESSION_TTL_SECONDS
   );
-  return token;
 }
 
 async function authenticate(request: FastifyRequest): Promise<void> {
   const token = request.cookies[config.COOKIE_NAME];
   if (!token) throw new HttpError(401, 'UNAUTHENTICATED', 'Authentication required');
-  const raw = await redis.get(sessionKey(token));
+  const raw = await withTimeout(
+    redis.get(sessionKey(token)),
+    config.REDIS_COMMAND_TIMEOUT_MS,
+    'Redis session lookup'
+  );
   if (!raw) throw new HttpError(401, 'SESSION_EXPIRED', 'Session expired');
   let data: { userId: string; sessionVersion: number };
   try {
@@ -97,7 +167,11 @@ async function authenticate(request: FastifyRequest): Promise<void> {
     await redis.del(sessionKey(token));
     throw new HttpError(401, 'SESSION_INVALID', 'Session invalid');
   }
-  const user = await prisma.user.findUnique({ where: { id: data.userId } });
+  const user = await withTimeout(
+    prisma.user.findUnique({ where: { id: data.userId } }),
+    config.DATABASE_OPERATION_TIMEOUT_MS,
+    'MariaDB session lookup'
+  );
   if (!user || user.sessionVersion !== data.sessionVersion) {
     await redis.del(sessionKey(token));
     throw new HttpError(401, 'SESSION_INVALID', 'Session invalid');
@@ -109,7 +183,11 @@ async function authenticate(request: FastifyRequest): Promise<void> {
     displayName: user.displayName,
     mustChangePassword: user.mustChangePassword
   };
-  await redis.expire(sessionKey(token), config.SESSION_TTL_SECONDS);
+  await withTimeout(
+    redis.expire(sessionKey(token), config.SESSION_TTL_SECONDS),
+    config.REDIS_COMMAND_TIMEOUT_MS,
+    'Redis session renewal'
+  );
 }
 
 function currentUser(request: FastifyRequest): SessionUser {
@@ -126,28 +204,134 @@ function requireOrigin(request: FastifyRequest): void {
 }
 
 async function bootstrapAdmin(): Promise<void> {
-  const existingAdmin = await prisma.user.findFirst({
-    where: { role: 'ADMIN' },
-    select: { id: true }
-  });
-  if (existingAdmin) return;
-  const passwordHash = await hash(config.ADMIN_PASSWORD, {
-    type: argon2id,
-    memoryCost: 65_536,
-    timeCost: 3,
-    parallelism: 1
-  });
-  await prisma.user.upsert({
-    where: { email: config.ADMIN_EMAIL },
-    update: {},
-    create: {
-      email: config.ADMIN_EMAIL,
-      displayName: 'Administrator',
-      passwordHash,
-      role: 'ADMIN',
-      mustChangePassword: true
+  const startedAt = performance.now();
+  const configuredUser = await withTimeout(
+    prisma.user.findUnique({
+      where: { email: config.ADMIN_EMAIL }
+    }),
+    config.DATABASE_OPERATION_TIMEOUT_MS,
+    'MariaDB admin lookup'
+  );
+  if (configuredUser) {
+    if (configuredUser.role !== 'ADMIN' || !configuredUser.passwordHash) {
+      throw new Error('Configured ADMIN_EMAIL exists but is not a complete administrator account');
     }
-  });
+    if (configuredUser.mustChangePassword) {
+      const verifyStartedAt = performance.now();
+      const configuredPasswordMatches = await withTimeout(
+        verify(configuredUser.passwordHash, config.ADMIN_PASSWORD),
+        config.AUTH_PASSWORD_VERIFY_TIMEOUT_MS,
+        'Bootstrap Argon2 verification'
+      );
+      console.info(
+        JSON.stringify({
+          event: 'auth.bootstrap.password_verify.complete',
+          durationMs: Math.round(performance.now() - verifyStartedAt)
+        })
+      );
+      if (!configuredPasswordMatches) {
+        throw new Error(
+          'Configured administrator still requires a password change, but ADMIN_PASSWORD does not match its stored hash'
+        );
+      }
+    } else {
+      needsRehash(configuredUser.passwordHash, {
+        memoryCost: 65_536,
+        timeCost: 3,
+        parallelism: 1
+      });
+    }
+    console.info(
+      JSON.stringify({
+        event: 'auth.bootstrap.complete',
+        result: 'existing',
+        durationMs: Math.round(performance.now() - startedAt)
+      })
+    );
+    return;
+  }
+  const existingAdmin = await withTimeout(
+    prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+      select: { id: true }
+    }),
+    config.DATABASE_OPERATION_TIMEOUT_MS,
+    'MariaDB administrator lookup'
+  );
+  if (existingAdmin) {
+    throw new Error(
+      'An administrator exists with a different email. ADMIN_EMAIL must match the existing administrator'
+    );
+  }
+  const hashStartedAt = performance.now();
+  const passwordHash = await withTimeout(
+    hash(config.ADMIN_PASSWORD, {
+      type: argon2id,
+      memoryCost: 65_536,
+      timeCost: 3,
+      parallelism: 1
+    }),
+    config.AUTH_PASSWORD_VERIFY_TIMEOUT_MS,
+    'Bootstrap Argon2 hashing'
+  );
+  console.info(
+    JSON.stringify({
+      event: 'auth.bootstrap.password_hash.complete',
+      durationMs: Math.round(performance.now() - hashStartedAt)
+    })
+  );
+  await withTimeout(
+    prisma.user.create({
+      data: {
+        email: config.ADMIN_EMAIL,
+        displayName: 'Administrator',
+        passwordHash,
+        role: 'ADMIN',
+        mustChangePassword: true
+      }
+    }),
+    config.DATABASE_OPERATION_TIMEOUT_MS,
+    'MariaDB administrator creation'
+  );
+  console.info(
+    JSON.stringify({
+      event: 'auth.bootstrap.complete',
+      result: 'created',
+      durationMs: Math.round(performance.now() - startedAt)
+    })
+  );
+}
+
+async function verifyRedisIntegration(): Promise<void> {
+  const startedAt = performance.now();
+  const key = `infra-hub:startup:${randomBytes(12).toString('hex')}`;
+  const value = randomBytes(16).toString('hex');
+  await withTimeout(redis.ping(), config.REDIS_COMMAND_TIMEOUT_MS, 'Redis PING');
+  try {
+    await withTimeout(
+      redis.set(key, value, 'PX', 10_000),
+      config.REDIS_COMMAND_TIMEOUT_MS,
+      'Redis startup SET'
+    );
+    const stored = await withTimeout(
+      redis.get(key),
+      config.REDIS_COMMAND_TIMEOUT_MS,
+      'Redis startup GET'
+    );
+    if (stored !== value) throw new Error('Redis startup SET/GET validation returned a mismatch');
+  } finally {
+    await withTimeout(
+      redis.del(key),
+      config.REDIS_COMMAND_TIMEOUT_MS,
+      'Redis startup cleanup'
+    ).catch(() => undefined);
+  }
+  console.info(
+    JSON.stringify({
+      event: 'redis.startup_check.complete',
+      durationMs: Math.round(performance.now() - startedAt)
+    })
+  );
 }
 
 async function queueConnectionOperation(
@@ -199,6 +383,13 @@ export async function buildApp() {
   });
   await app.register(helmet);
   await app.register(cookie);
+  app.addHook('onRequest', (request, _reply, done) => {
+    if (request.method === 'POST' && request.url.startsWith('/api/v1/auth/login')) {
+      request.loginReceivedAt = performance.now();
+      request.log.info({ event: 'auth.login.request_received' }, 'auth.login.request_received');
+    }
+    done();
+  });
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute', redis });
 
   app.setErrorHandler((error, request, reply) => {
@@ -218,7 +409,14 @@ export async function buildApp() {
   app.get('/health/live', () => ({ status: 'ok' }));
   app.get('/health/ready', async (_request, reply) => {
     try {
-      await Promise.all([prisma.$queryRaw`SELECT 1`, redis.ping()]);
+      await Promise.all([
+        withTimeout(
+          prisma.$queryRaw`SELECT 1`,
+          config.DATABASE_OPERATION_TIMEOUT_MS,
+          'MariaDB readiness check'
+        ),
+        withTimeout(redis.ping(), config.REDIS_COMMAND_TIMEOUT_MS, 'Redis readiness check')
+      ]);
       return { status: 'ready' };
     } catch {
       return reply.status(503).send({ status: 'not_ready' });
@@ -232,23 +430,119 @@ export async function buildApp() {
       preHandler: requireOrigin
     },
     async (request, reply) => {
+      const loginStartedAt = performance.now();
+      const loginStageTimeout = (stageTimeoutMs: number) => {
+        const remainingMs = config.AUTH_LOGIN_TIMEOUT_MS - (performance.now() - loginStartedAt);
+        if (remainingMs <= 0) {
+          throw new HttpError(
+            503,
+            'AUTH_LOGIN_TIMEOUT',
+            `Authentication did not complete within ${config.AUTH_LOGIN_TIMEOUT_MS}ms`
+          );
+        }
+        return Math.min(stageTimeoutMs, remainingMs);
+      };
+      request.log.info(
+        {
+          event: 'auth.login',
+          preHandlerDurationMs: request.loginReceivedAt
+            ? Math.round(loginStartedAt - request.loginReceivedAt)
+            : undefined
+        },
+        'auth.login.start'
+      );
+      const validationStartedAt = performance.now();
+      request.log.info({ event: 'auth.login.validation' }, 'auth.login.validation.start');
       const input = parse(loginSchema, request.body);
-      const user = await prisma.user.findUnique({ where: { email: input.email.toLowerCase() } });
-      if (!user || !(await verify(user.passwordHash, input.password))) {
+      request.log.info(
+        {
+          event: 'auth.login.validation',
+          durationMs: Math.round(performance.now() - validationStartedAt)
+        },
+        'auth.login.validation.complete'
+      );
+      const user = await loginStage(
+        request,
+        'auth.login.user_lookup',
+        () => prisma.user.findUnique({ where: { email: input.email.toLowerCase() } }),
+        loginStageTimeout(config.DATABASE_OPERATION_TIMEOUT_MS)
+      );
+      request.log.info(
+        { event: 'auth.login.password_hash_lookup' },
+        'auth.login.password_hash_lookup.start'
+      );
+      request.log.info(
+        { event: 'auth.login.password_hash_lookup', found: Boolean(user?.passwordHash) },
+        'auth.login.password_hash_lookup.complete'
+      );
+      const passwordValid =
+        user &&
+        (await loginStage(
+          request,
+          'auth.login.password_verify',
+          () => verify(user.passwordHash, input.password),
+          loginStageTimeout(config.AUTH_PASSWORD_VERIFY_TIMEOUT_MS)
+        ));
+      if (!user || !passwordValid) {
         throw new HttpError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
       }
-      const token = await createSession(user);
+      const sessionStartedAt = performance.now();
+      request.log.info({ event: 'auth.login.session_create' }, 'auth.login.session_create.start');
+      const token = createSessionToken();
+      request.log.info(
+        {
+          event: 'auth.login.session_create',
+          durationMs: Math.round(performance.now() - sessionStartedAt)
+        },
+        'auth.login.session_create.complete'
+      );
+      await loginStage(
+        request,
+        'auth.login.redis_connection',
+        () => redis.ping(),
+        loginStageTimeout(config.REDIS_COMMAND_TIMEOUT_MS)
+      );
+      await loginStage(
+        request,
+        'auth.login.redis_write',
+        () => writeSession(token, user),
+        loginStageTimeout(config.REDIS_COMMAND_TIMEOUT_MS)
+      );
+      try {
+        await loginStage(
+          request,
+          'auth.login.audit',
+          () =>
+            prisma.auditEvent.create({
+              data: {
+                userId: user.id,
+                action: 'auth.login',
+                entityType: 'User',
+                entityId: user.id,
+                message: 'Signed in'
+              }
+            }),
+          loginStageTimeout(config.DATABASE_OPERATION_TIMEOUT_MS)
+        );
+      } catch (error) {
+        await withTimeout(
+          redis.del(sessionKey(token)),
+          config.REDIS_COMMAND_TIMEOUT_MS,
+          'Redis failed-login cleanup'
+        ).catch(() => undefined);
+        throw error;
+      }
+      const cookieStartedAt = performance.now();
+      request.log.info({ event: 'auth.login.cookie' }, 'auth.login.cookie.start');
       reply.setCookie(config.COOKIE_NAME, token, cookieOptions());
-      await prisma.auditEvent.create({
-        data: {
-          userId: user.id,
-          action: 'auth.login',
-          entityType: 'User',
-          entityId: user.id,
-          message: 'Signed in'
-        }
-      });
-      return {
+      request.log.info(
+        {
+          event: 'auth.login.cookie',
+          durationMs: Math.round(performance.now() - cookieStartedAt)
+        },
+        'auth.login.cookie.complete'
+      );
+      const response = {
         user: {
           id: user.id,
           email: user.email,
@@ -256,6 +550,14 @@ export async function buildApp() {
           mustChangePassword: user.mustChangePassword
         }
       };
+      request.log.info(
+        {
+          event: 'auth.login.response',
+          durationMs: Math.round(performance.now() - loginStartedAt)
+        },
+        'auth.login.response'
+      );
+      return reply.send(response);
     }
   );
 
@@ -644,12 +946,19 @@ export async function buildApp() {
 }
 
 async function start(): Promise<void> {
+  await verifyRedisIntegration();
   await bootstrapAdmin();
   const app = await buildApp();
   await app.listen({ host: config.API_HOST, port: config.API_PORT });
   const shutdown = async () => {
     await app.close();
-    await Promise.all([dnsQueue.close(), systemQueue.close(), redis.quit(), prisma.$disconnect()]);
+    await Promise.all([
+      dnsQueue.close(),
+      systemQueue.close(),
+      redis.quit(),
+      queueRedis.quit(),
+      prisma.$disconnect()
+    ]);
   };
   process.once('SIGINT', () => void shutdown());
   process.once('SIGTERM', () => void shutdown());

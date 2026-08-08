@@ -63,8 +63,10 @@ COPY --from=build /prod/database/prisma.config.ts ./database/prisma.config.ts
 COPY --from=build /prod/database/prisma ./database/prisma
 COPY --from=build /prod/database/scripts ./database/scripts
 COPY --from=build /prod/database/node_modules ./database/node_modules
+COPY scripts/smoke-auth.mjs ./smoke-auth.mjs
 COPY --chmod=755 docker/start-api.sh /usr/local/bin/start-api
 RUN node -e "['fastify','@fastify/cookie','@fastify/helmet','@fastify/rate-limit','ioredis','bullmq','argon2','mariadb','@prisma/client','zod','dotenv'].forEach(require.resolve); require('@prisma/client'); console.log('Runtime dependencies OK')"
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=8 CMD node -e "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 CMD ["/usr/local/bin/start-api"]
 
 FROM runtime AS worker
@@ -72,4 +74,5 @@ COPY --from=build /prod/worker/package.json ./package.json
 COPY --from=build /prod/worker/dist ./dist
 COPY --from=build /prod/worker/node_modules ./node_modules
 RUN node -e "['ioredis','bullmq','mariadb','@prisma/client','zod','dotenv'].forEach(require.resolve); require('@prisma/client'); console.log('Worker runtime dependencies OK')"
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 CMD node -e "require('node:fs').accessSync('/tmp/infra-hub-worker-ready')"
 CMD ["node", "/app/dist/index.js"]

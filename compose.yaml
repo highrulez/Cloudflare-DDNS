@@ -10,6 +10,10 @@ x-app-environment: &app-environment
   PUBLIC_IPV4_URL: ${PUBLIC_IPV4_URL:-https://api.ipify.org}
   PUBLIC_IPV6_URL: ${PUBLIC_IPV6_URL:-https://api6.ipify.org}
   LOG_LEVEL: ${LOG_LEVEL:-info}
+  DATABASE_CONNECT_TIMEOUT_MS: ${DATABASE_CONNECT_TIMEOUT_MS:-5000}
+  DATABASE_OPERATION_TIMEOUT_MS: ${DATABASE_OPERATION_TIMEOUT_MS:-5000}
+  REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-5000}
+  REDIS_COMMAND_TIMEOUT_MS: ${REDIS_COMMAND_TIMEOUT_MS:-3000}
 
 services:
   web:
@@ -50,6 +54,8 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       DB_STARTUP_MAX_ATTEMPTS: ${DB_STARTUP_MAX_ATTEMPTS:-60}
       DB_STARTUP_RETRY_SECONDS: ${DB_STARTUP_RETRY_SECONDS:-2}
+      AUTH_PASSWORD_VERIFY_TIMEOUT_MS: ${AUTH_PASSWORD_VERIFY_TIMEOUT_MS:-15000}
+      AUTH_LOGIN_TIMEOUT_MS: ${AUTH_LOGIN_TIMEOUT_MS:-25000}
     expose:
       - '3000'
     depends_on:
@@ -69,7 +75,7 @@ services:
           'CMD',
           'node',
           '-e',
-          "fetch('http://127.0.0.1:3000/api/v1/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
         ]
       interval: 15s
       timeout: 5s

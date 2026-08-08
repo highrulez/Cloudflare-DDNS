@@ -79,7 +79,9 @@ Startup order is automatic:
 2. Redis becomes healthy.
 3. The API receives the real `DATABASE_URL` from `.env` at runtime and waits for MariaDB connectivity.
 4. Prisma applies pending migrations to `infrahub`.
-5. The API creates the first administrator only when no administrator exists.
+5. The API creates the configured administrator only when no administrator exists. On later
+   starts, `ADMIN_EMAIL` must match the existing administrator. While the bootstrap password
+   change is still required, `ADMIN_PASSWORD` must also match the stored hash.
 6. The API becomes healthy.
 7. The worker starts its prebuilt Node artifact and reports healthy after its BullMQ consumers and scheduler initialize.
 8. The web dashboard starts after API health succeeds.
@@ -105,6 +107,18 @@ docker compose ps
 docker compose logs -f api worker
 ```
 
+The single canonical readiness probe is:
+
+```sh
+curl -fsS http://127.0.0.1:8080/health/ready
+```
+
+Run the end-to-end login smoke test from the project directory:
+
+```sh
+docker compose exec api node /app/smoke-auth.mjs
+```
+
 Update:
 
 ```sh
@@ -127,4 +141,6 @@ The application database remains in the existing Synology MariaDB service. Inclu
 - `Connection refused`: confirm MariaDB listens on the NAS LAN address rather than only `127.0.0.1`.
 - Migration permission errors: grant `infrahub_app` schema-level DDL privileges on `infrahub`.
 - Origin rejected: make `ALLOWED_ORIGINS` exactly match the browser URL, including scheme and port.
-- API remains unhealthy: inspect `docker compose logs api`; the startup script retries MariaDB connectivity and migrations before exiting.
+- API remains unhealthy: confirm `GET /health/ready` and inspect `docker compose logs api`; the startup script retries MariaDB connectivity and migrations before exiting.
+- Login timeout: filter API logs for `auth.login.*`. Every database, Argon2, Redis, audit,
+  cookie, and response stage emits a duration without logging credentials or session secrets.

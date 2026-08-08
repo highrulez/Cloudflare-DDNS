@@ -14,6 +14,7 @@
     "test": "corepack pnpm -r --if-present test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "smoke:auth": "node scripts/smoke-auth.mjs",
     "db:generate": "corepack pnpm --filter @infra-hub/database prisma:generate",
     "db:migrate": "corepack pnpm --filter @infra-hub/database prisma:migrate",
     "db:deploy": "corepack pnpm --filter @infra-hub/database prisma:deploy"

@@ -28,9 +28,20 @@ if (envFile) loadDotenv({ path: envFile, quiet: true });
 const config = loadWorkerConfig();
 const workerHealthFile = process.env.WORKER_HEALTH_FILE ?? '/tmp/infra-hub-worker-ready';
 rmSync(workerHealthFile, { force: true });
-const connection = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
-const schedulerConnection = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
-const cacheConnection = new Redis(config.REDIS_URL);
+const workerRedisOptions = {
+  connectTimeout: config.REDIS_CONNECT_TIMEOUT_MS,
+  maxRetriesPerRequest: null,
+  retryStrategy: (attempt: number) => Math.min(attempt * 200, 2_000)
+} as const;
+const connection = new Redis(config.REDIS_URL, workerRedisOptions);
+const schedulerConnection = new Redis(config.REDIS_URL, workerRedisOptions);
+const cacheConnection = new Redis(config.REDIS_URL, {
+  connectTimeout: config.REDIS_CONNECT_TIMEOUT_MS,
+  commandTimeout: config.REDIS_COMMAND_TIMEOUT_MS,
+  maxRetriesPerRequest: 1,
+  enableOfflineQueue: false,
+  retryStrategy: workerRedisOptions.retryStrategy
+});
 const providers = createProviderRegistry(config.CLOUDFLARE_API_BASE);
 
 function dashboardCacheKey(userId: string): string {

@@ -119,6 +119,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`/api/v1${path}`, {
     credentials: 'include',
     ...init,
+    signal: init.signal ?? AbortSignal.timeout(30_000),
     headers: { 'Content-Type': 'application/json', ...init.headers }
   });
   if (!response.ok) {

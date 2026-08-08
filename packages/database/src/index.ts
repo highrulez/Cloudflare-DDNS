@@ -12,6 +12,11 @@ const envFile = [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.
 );
 if (envFile) loadDotenv({ path: envFile, quiet: true });
 
+function timeoutFromEnv(name: string, fallback: number): number {
+  const value = Number(process.env[name] ?? fallback);
+  return Number.isInteger(value) && value >= 500 ? value : fallback;
+}
+
 function createClient(): PrismaClientType {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error('DATABASE_URL is required');
@@ -25,7 +30,11 @@ function createClient(): PrismaClientType {
     user: decodeURIComponent(url.username),
     password: decodeURIComponent(url.password),
     database,
-    connectionLimit: 10
+    connectionLimit: 10,
+    connectTimeout: timeoutFromEnv('DATABASE_CONNECT_TIMEOUT_MS', 5_000),
+    acquireTimeout: timeoutFromEnv('DATABASE_OPERATION_TIMEOUT_MS', 5_000),
+    socketTimeout: timeoutFromEnv('DATABASE_OPERATION_TIMEOUT_MS', 5_000),
+    queryTimeout: timeoutFromEnv('DATABASE_OPERATION_TIMEOUT_MS', 5_000)
   });
   return new PrismaClient({
     adapter,
