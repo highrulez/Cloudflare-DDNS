@@ -29,6 +29,7 @@ RUN DATABASE_URL="mysql://prisma_build:prisma_build@127.0.0.1:3306/prisma_build"
     && pnpm --filter @infra-hub/api deploy --prod --legacy /prod/api \
     && pnpm --filter @infra-hub/worker deploy --prod --legacy /prod/worker \
     && pnpm --filter @infra-hub/database deploy --prod --legacy /prod/database \
+    && rm -rf /prod/api/node_modules/@infra-hub /prod/worker/node_modules/@infra-hub \
     && generated_package="$(readlink -f /app/packages/database/node_modules/@prisma/client)" \
     && generated_client="$(dirname "$(dirname "${generated_package}")")/.prisma" \
     && test -d "${generated_client}/client" \
@@ -54,19 +55,21 @@ WORKDIR /app
 USER node
 
 FROM runtime AS api
-COPY --from=build /prod/api/package.json ./apps/api/package.json
-COPY --from=build /prod/api/dist ./apps/api/dist
-COPY --from=build /prod/api/node_modules ./apps/api/node_modules
-COPY --from=build /prod/database/package.json ./packages/database/package.json
-COPY --from=build /prod/database/prisma.config.ts ./packages/database/prisma.config.ts
-COPY --from=build /prod/database/prisma ./packages/database/prisma
-COPY --from=build /prod/database/scripts ./packages/database/scripts
-COPY --from=build /prod/database/node_modules ./packages/database/node_modules
+COPY --from=build /prod/api/package.json ./package.json
+COPY --from=build /prod/api/dist ./dist
+COPY --from=build /prod/api/node_modules ./node_modules
+COPY --from=build /prod/database/package.json ./database/package.json
+COPY --from=build /prod/database/prisma.config.ts ./database/prisma.config.ts
+COPY --from=build /prod/database/prisma ./database/prisma
+COPY --from=build /prod/database/scripts ./database/scripts
+COPY --from=build /prod/database/node_modules ./database/node_modules
 COPY --chmod=755 docker/start-api.sh /usr/local/bin/start-api
+RUN node -e "['fastify','@fastify/cookie','@fastify/helmet','@fastify/rate-limit','ioredis','bullmq','argon2','mariadb','@prisma/client','zod','dotenv'].forEach(require.resolve); require('@prisma/client'); console.log('Runtime dependencies OK')"
 CMD ["/usr/local/bin/start-api"]
 
 FROM runtime AS worker
-COPY --from=build /prod/worker/package.json ./apps/worker/package.json
-COPY --from=build /prod/worker/dist ./apps/worker/dist
-COPY --from=build /prod/worker/node_modules ./apps/worker/node_modules
-CMD ["node", "/app/apps/worker/dist/index.js"]
+COPY --from=build /prod/worker/package.json ./package.json
+COPY --from=build /prod/worker/dist ./dist
+COPY --from=build /prod/worker/node_modules ./node_modules
+RUN node -e "['ioredis','bullmq','mariadb','@prisma/client','zod','dotenv'].forEach(require.resolve); require('@prisma/client'); console.log('Worker runtime dependencies OK')"
+CMD ["node", "/app/dist/index.js"]
