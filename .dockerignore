@@ -1,0 +1,13 @@
+.git
+.cursor
+node_modules
+**/node_modules
+**/dist
+**/coverage
+.env
+.env.*
+!.env.example
+*.log
+data
+mysql-data
+redis-data

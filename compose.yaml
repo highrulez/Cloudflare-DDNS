@@ -1,0 +1,140 @@
+name: infrastructure-hub
+
+x-app-environment: &app-environment
+  NODE_ENV: production
+  DATABASE_URL: ${DATABASE_URL}
+  REDIS_URL: ${REDIS_URL}
+  APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY}
+  APP_ENCRYPTION_KEY_VERSION: ${APP_ENCRYPTION_KEY_VERSION:-1}
+  ADMIN_EMAIL: ${ADMIN_EMAIL}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080}
+  SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-43200}
+  COOKIE_NAME: ${COOKIE_NAME:-infra_hub_session}
+  COOKIE_SECURE: ${COOKIE_SECURE:-false}
+  CLOUDFLARE_API_BASE: ${CLOUDFLARE_API_BASE:-https://api.cloudflare.com/client/v4}
+  PUBLIC_IPV4_URL: ${PUBLIC_IPV4_URL:-https://api.ipify.org}
+  PUBLIC_IPV6_URL: ${PUBLIC_IPV6_URL:-https://api6.ipify.org}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    ports:
+      - '${WEB_PORT:-8080}:8080'
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    networks:
+      - frontend
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+      target: api
+    environment:
+      <<: *app-environment
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+    expose:
+      - '3000'
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    networks:
+      - frontend
+      - backend
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.app
+      target: worker
+    environment:
+      <<: *app-environment
+    restart: unless-stopped
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    networks:
+      - backend
+
+  mysql:
+    image: mysql:8.4
+    profiles: ['bundled']
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-infrastructure_hub}
+      MYSQL_USER: ${MYSQL_USER:-infra_hub}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ['CMD-SHELL', 'mysqladmin ping -h 127.0.0.1 -u root -p$${MYSQL_ROOT_PASSWORD} --silent']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    networks:
+      - backend
+
+  redis:
+    image: redis:7.4-alpine
+    profiles: ['bundled']
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command:
+      - /bin/sh
+      - -c
+      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ['CMD-SHELL', 'test "$$(redis-cli -a "$${REDIS_PASSWORD}" ping)" = PONG']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks:
+      - backend
+
+volumes:
+  mysql-data:
+  redis-data:
+
+networks:
+  frontend:
+  backend:

@@ -1,0 +1,203 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum UserRole {
+  ADMIN
+}
+
+enum ConnectionStatus {
+  PENDING
+  CONNECTING
+  ACTIVE
+  DEGRADED
+  FAILED
+  REVOKED
+}
+
+enum CredentialStatus {
+  STAGED
+  ACTIVE
+  REVOKED
+}
+
+enum SyncStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+model User {
+  id                  String               @id @default(cuid())
+  email               String               @unique @db.VarChar(254)
+  displayName         String               @db.VarChar(100)
+  passwordHash        String               @db.VarChar(255)
+  role                UserRole             @default(ADMIN)
+  mustChangePassword  Boolean              @default(true)
+  sessionVersion      Int                  @default(1)
+  providerConnections ProviderConnection[]
+  providerAccounts    ProviderAccount[]
+  auditEvents         AuditEvent[]
+  ddnsSelections      DdnsSelection[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model ProviderConnection {
+  id            String               @id @default(cuid())
+  userId        String
+  providerKey   String               @db.VarChar(32)
+  label         String               @db.VarChar(80)
+  status        ConnectionStatus     @default(PENDING)
+  statusMessage String?              @db.VarChar(500)
+  lastCheckedAt DateTime?
+  lastSyncedAt  DateTime?
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentials   ProviderCredential[]
+  accounts      ProviderAccount[]
+  syncRuns      SyncRun[]
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@unique([userId, providerKey, label])
+  @@index([userId, status])
+}
+
+model ProviderCredential {
+  id           String             @id @default(cuid())
+  connectionId String
+  status       CredentialStatus   @default(STAGED)
+  ciphertext   String             @db.Text
+  iv           String             @db.VarChar(64)
+  authTag      String             @db.VarChar(64)
+  keyVersion   Int                @default(1)
+  maskedHint   String             @db.VarChar(16)
+  verifiedAt   DateTime?
+  connection   ProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@index([connectionId, status])
+}
+
+model ProviderAccount {
+  id           String             @id @default(cuid())
+  userId       String
+  connectionId String
+  externalId   String             @db.VarChar(191)
+  name         String             @db.VarChar(191)
+  isSynthetic  Boolean            @default(false)
+  staleAt      DateTime?
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection   ProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  zones        DnsZone[]
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@unique([connectionId, externalId])
+  @@index([userId, name])
+}
+
+model DnsZone {
+  id          String          @id @default(cuid())
+  accountId   String
+  externalId  String          @db.VarChar(191)
+  name        String          @db.VarChar(253)
+  status      String?         @db.VarChar(32)
+  nameservers String?         @db.Text
+  staleAt     DateTime?
+  account     ProviderAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  records     DnsRecord[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([accountId, externalId])
+  @@index([name])
+}
+
+model DnsRecord {
+  id         String         @id @default(cuid())
+  zoneId     String
+  externalId String         @db.VarChar(191)
+  type       String         @db.VarChar(16)
+  name       String         @db.VarChar(253)
+  content    String         @db.Text
+  ttl        Int
+  proxied    Boolean?
+  priority   Int?
+  staleAt    DateTime?
+  zone       DnsZone        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  selection  DdnsSelection?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([zoneId, externalId])
+  @@index([name, type])
+}
+
+model DdnsSelection {
+  id        String    @id @default(cuid())
+  userId    String
+  recordId  String    @unique
+  enabled   Boolean   @default(true)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  record    DnsRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId, enabled])
+}
+
+model SyncRun {
+  id            String             @id @default(cuid())
+  connectionId  String
+  jobId         String?            @db.VarChar(191)
+  status        SyncStatus         @default(QUEUED)
+  accountsFound Int                @default(0)
+  zonesFound    Int                @default(0)
+  recordsFound  Int                @default(0)
+  errorMessage  String?            @db.Text
+  startedAt     DateTime?
+  completedAt   DateTime?
+  connection    ProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  createdAt     DateTime           @default(now())
+
+  @@index([connectionId, createdAt])
+}
+
+model IpObservation {
+  id        String   @id @default(cuid())
+  address   String   @db.VarChar(45)
+  family    Int
+  source    String   @db.VarChar(64)
+  changed   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+model AppSetting {
+  key       String   @id @db.VarChar(100)
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String   @db.VarChar(80)
+  entityType String?  @db.VarChar(80)
+  entityId   String?  @db.VarChar(191)
+  message    String   @db.VarChar(500)
+  metadata   String?  @db.Text
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}

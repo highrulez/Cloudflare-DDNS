@@ -1,0 +1,16 @@
+node_modules/
+.cursor/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.vite/
+.turbo/
+apps/api/generated/
+packages/database/generated/
+data/
+mysql-data/
+redis-data/

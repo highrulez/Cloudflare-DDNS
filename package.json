@@ -1,0 +1,34 @@
+{
+  "name": "infrastructure-hub",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.20.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "corepack pnpm -r --if-present build",
+    "dev": "corepack pnpm --parallel --filter @infra-hub/api --filter @infra-hub/worker --filter @infra-hub/web dev",
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "corepack pnpm -r --if-present typecheck",
+    "test": "corepack pnpm -r --if-present test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "corepack pnpm --filter @infra-hub/database prisma:generate",
+    "db:migrate": "corepack pnpm --filter @infra-hub/database prisma:migrate",
+    "db:deploy": "corepack pnpm --filter @infra-hub/database prisma:deploy"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.1.2",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.9.0",
+    "prettier": "^3.9.6",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.10",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
+  }
+}

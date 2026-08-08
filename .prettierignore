@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.git/
+.cursor/
+.env
+.env.*
+!.env.example
+.env.example
+.gitignore
+.dockerignore
+Dockerfile*
+docker/*.conf
+docker/*.sh
+**/*.prisma
