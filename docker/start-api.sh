@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+: "${DATABASE_URL:?DATABASE_URL must be provided at container runtime}"
+
 attempt=1
 max_attempts="${DB_STARTUP_MAX_ATTEMPTS:-60}"
 retry_seconds="${DB_STARTUP_RETRY_SECONDS:-2}"

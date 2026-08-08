@@ -25,7 +25,8 @@ The API only queues database identifiers. Provider credentials never enter BullM
 3. Start the application:
 
    ```sh
-   docker compose up -d --build
+   docker compose build
+   docker compose up -d
    ```
 
 4. Open `http://192.168.68.100:8080` and sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
@@ -33,6 +34,8 @@ The API only queues database identifiers. Provider credentials never enter BullM
 The bootstrap credentials only create the first user. Change the password from Settings immediately.
 
 The default Compose project creates only the web, API, worker, and Redis services. It connects to the existing Synology MariaDB server through `DATABASE_URL` and never creates a database container.
+
+Image builds do not contact MariaDB. Prisma Client is generated with a non-production placeholder URL because Prisma validates configuration while generating; the placeholder is scoped to the build command and is not present in the runtime image. Migrations run only from the API startup script using the runtime `DATABASE_URL`.
 
 See [Synology deployment](docs/synology.md) for MariaDB permissions, Container Manager instructions, startup behavior, backups, and troubleshooting.
 

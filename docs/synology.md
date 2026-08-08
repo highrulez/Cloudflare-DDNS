@@ -67,19 +67,21 @@ If the dashboard is exposed through HTTPS or a reverse proxy, set `ALLOWED_ORIGI
 From SSH:
 
 ```sh
-docker compose up -d --build
+docker compose build
+docker compose up -d
 ```
 
 Or create a Container Manager project using `compose.yaml` from the project folder and deploy it.
 
 Startup order is automatic:
 
-1. Redis becomes healthy.
-2. The API waits for MariaDB connectivity.
-3. Prisma applies pending migrations to `infrahub`.
-4. The API creates the first administrator only when no administrator exists.
-5. The API becomes healthy.
-6. The worker and web dashboard start.
+1. Images build without contacting MariaDB. Prisma Client generation uses a build-scoped placeholder URL containing no production credentials.
+2. Redis becomes healthy.
+3. The API receives the real `DATABASE_URL` from `.env` at runtime and waits for MariaDB connectivity.
+4. Prisma applies pending migrations to `infrahub`.
+5. The API creates the first administrator only when no administrator exists.
+6. The API becomes healthy.
+7. The worker and web dashboard start.
 
 Open:
 
@@ -102,7 +104,8 @@ Update:
 
 ```sh
 git pull
-docker compose up -d --build
+docker compose build
+docker compose up -d
 ```
 
 Stop without deleting Redis data:
