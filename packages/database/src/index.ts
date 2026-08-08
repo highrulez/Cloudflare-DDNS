@@ -1,16 +1,18 @@
-import { PrismaClient } from '@prisma/client';
+import PrismaClientPackage from '@prisma/client';
+import type { PrismaClient as PrismaClientType } from '@prisma/client';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { config as loadDotenv } from 'dotenv';
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const { PrismaClient } = PrismaClientPackage;
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClientType };
 const envFile = [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.env')].find(
   existsSync
 );
 if (envFile) loadDotenv({ path: envFile, quiet: true });
 
-function createClient(): PrismaClient {
+function createClient(): PrismaClientType {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error('DATABASE_URL is required');
   const url = new URL(databaseUrl);

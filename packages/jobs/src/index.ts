@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
 export const QUEUES = {
-  dns: 'infra-hub:dns:v1',
-  system: 'infra-hub:system:v1'
+  dns: 'infra-hub-dns-v1',
+  system: 'infra-hub-system-v1'
 } as const;
 
 export const JOBS = {
@@ -38,9 +38,9 @@ export const defaultJobOptions = {
 } as const;
 
 export function connectionJobId(name: string, connectionId: string): string {
-  return `${name}:${connectionId}`;
+  return `${name}-${connectionId}`;
 }
 
 export function connectionRunJobId(name: string, connectionId: string, syncRunId: string): string {
-  return `${name}:${connectionId}:${syncRunId}`;
+  return `${name}-${connectionId}-${syncRunId}`;
 }

@@ -15,7 +15,7 @@ describe('connection job payloads', () => {
 
   it('creates a deterministic per-run job id', () => {
     expect(connectionRunJobId('sync-provider', payload.connectionId, payload.syncRunId)).toBe(
-      `sync-provider:${payload.connectionId}:${payload.syncRunId}`
+      `sync-provider-${payload.connectionId}-${payload.syncRunId}`
     );
   });
 });

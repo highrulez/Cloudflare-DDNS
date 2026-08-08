@@ -14,9 +14,12 @@
     "@infra-hub/database": "workspace:*",
     "@infra-hub/jobs": "workspace:*",
     "@infra-hub/shared": "workspace:*",
+    "@prisma/adapter-mariadb": "^7.9.1",
+    "@prisma/client": "^7.9.1",
     "bullmq": "^6.0.9",
     "dotenv": "^17.4.2",
     "ioredis": "^6.0.0",
+    "mariadb": "^3.5.3",
     "zod": "^4.4.3"
   }
 }
