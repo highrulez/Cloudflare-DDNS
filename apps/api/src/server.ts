@@ -126,8 +126,11 @@ function requireOrigin(request: FastifyRequest): void {
 }
 
 async function bootstrapAdmin(): Promise<void> {
-  const existing = await prisma.user.findUnique({ where: { email: config.ADMIN_EMAIL } });
-  if (existing) return;
+  const existingAdmin = await prisma.user.findFirst({
+    where: { role: 'ADMIN' },
+    select: { id: true }
+  });
+  if (existingAdmin) return;
   const passwordHash = await hash(config.ADMIN_PASSWORD, {
     type: argon2id,
     memoryCost: 65_536,

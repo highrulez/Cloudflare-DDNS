@@ -7,16 +7,16 @@ Infrastructure Hub is a self-hosted operations dashboard for DNS and infrastruct
 - React + Vite dashboard behind an unprivileged Nginx reverse proxy
 - Fastify API with Redis-backed opaque sessions
 - BullMQ workers for provider discovery and scheduled observations
-- Prisma with MySQL 8.0+ (MariaDB 10.11 is a compatibility target)
+- Prisma with the official MariaDB adapter and an external MariaDB 10.x database
 - AES-256-GCM provider credential encryption
 - Capability-based provider adapters; Cloudflare is the first implementation
 
 The API only queues database identifiers. Provider credentials never enter BullMQ payloads or browser responses.
 
-## Quick start with bundled services
+## Synology quick start
 
 1. Copy `.env.example` to `.env`.
-2. Replace every password and generate `APP_ENCRYPTION_KEY`:
+2. Set the existing MariaDB password in `DATABASE_URL`, replace the Redis/admin passwords, and generate `APP_ENCRYPTION_KEY`:
 
    ```sh
    node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
@@ -25,26 +25,20 @@ The API only queues database identifiers. Provider credentials never enter BullM
 3. Start the application:
 
    ```sh
-   docker compose --profile bundled up --build
+   docker compose up -d --build
    ```
 
-4. Open `http://localhost:8080` and sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
+4. Open `http://192.168.68.100:8080` and sign in with `ADMIN_EMAIL` and `ADMIN_PASSWORD`.
 
 The bootstrap credentials only create the first user. Change the password from Settings immediately.
 
-## Existing MySQL and Redis
+The default Compose project creates only the web, API, worker, and Redis services. It connects to the existing Synology MariaDB server through `DATABASE_URL` and never creates a database container.
 
-Set `DATABASE_URL` to a MySQL 8.0+ server and `REDIS_URL` to a Redis 7-compatible server, then start only the application services:
-
-```sh
-docker compose up --build web api worker
-```
-
-The database user must be able to apply the included Prisma migrations. Redis should require authentication and must not be exposed publicly.
+See [Synology deployment](docs/synology.md) for MariaDB permissions, Container Manager instructions, startup behavior, backups, and troubleshooting.
 
 ## Local development
 
-Requirements: Node.js 22+, Corepack, MySQL 8.0+, and Redis 7+.
+Requirements: Node.js 22+, Corepack, MariaDB 10.x or MySQL 8.0+, and Redis 7+.
 
 ```sh
 corepack pnpm install

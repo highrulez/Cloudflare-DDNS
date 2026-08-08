@@ -11,37 +11,8 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_DATABASE: infrastructure_hub
-          MYSQL_USER: infra_hub
-          MYSQL_PASSWORD: test-password
-          MYSQL_ROOT_PASSWORD: root-test-password
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot-test-password --silent"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=12
-      redis:
-        image: redis:7.4-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=12
     env:
-      DATABASE_URL: mysql://infra_hub:test-password@127.0.0.1:3306/infrastructure_hub
-      REDIS_URL: redis://127.0.0.1:6379
-      APP_ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
-      ADMIN_EMAIL: admin@example.com
-      ADMIN_PASSWORD: test-password-change-me
-      APP_ORIGIN: http://localhost:5173
+      DATABASE_URL: mysql://ci-placeholder:ci-placeholder@127.0.0.1:3306/infrahub
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -51,7 +22,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:generate
-      - run: pnpm db:deploy
+      - run: pnpm --filter @infra-hub/database exec prisma validate
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test

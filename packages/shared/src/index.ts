@@ -92,22 +92,34 @@ const booleanEnv = z
   .default('false')
   .transform((value) => value === 'true');
 
+const runtimeConfigShape = {
+  DATABASE_URL: z.string().min(1),
+  REDIS_URL: z.string().url(),
+  APP_ENCRYPTION_KEY: z.string().transform((value, context) => {
+    const key = Buffer.from(value, 'base64');
+    if (key.length !== 32 || key.toString('base64') !== value) {
+      context.addIssue({
+        code: 'custom',
+        message: 'APP_ENCRYPTION_KEY must be canonical base64 for exactly 32 bytes'
+      });
+      return z.NEVER;
+    }
+    return key;
+  }),
+  APP_ENCRYPTION_KEY_VERSION: z.coerce.number().int().positive().default(1),
+  CLOUDFLARE_API_BASE: z.string().url().default('https://api.cloudflare.com/client/v4'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  IP_OBSERVATION_CRON: z.string().default('*/5 * * * *'),
+  PUBLIC_IPV4_URL: z.string().url().default('https://api.ipify.org'),
+  PUBLIC_IPV6_URL: z.string().url().default('https://api6.ipify.org')
+};
+
+export const workerConfigSchema = z.object(runtimeConfigShape);
+export type WorkerConfig = z.infer<typeof workerConfigSchema>;
+
 export const appConfigSchema = z
   .object({
-    DATABASE_URL: z.string().min(1),
-    REDIS_URL: z.string().url(),
-    APP_ENCRYPTION_KEY: z.string().transform((value, context) => {
-      const key = Buffer.from(value, 'base64');
-      if (key.length !== 32 || key.toString('base64') !== value) {
-        context.addIssue({
-          code: 'custom',
-          message: 'APP_ENCRYPTION_KEY must be canonical base64 for exactly 32 bytes'
-        });
-        return z.NEVER;
-      }
-      return key;
-    }),
-    APP_ENCRYPTION_KEY_VERSION: z.coerce.number().int().positive().default(1),
+    ...runtimeConfigShape,
     ADMIN_EMAIL: z
       .string()
       .email()
@@ -129,14 +141,7 @@ export const appConfigSchema = z
           .split(',')
           .map((origin) => origin.trim())
           .filter(Boolean)
-      ),
-    CLOUDFLARE_API_BASE: z.string().url().default('https://api.cloudflare.com/client/v4'),
-    LOG_LEVEL: z
-      .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
-      .default('info'),
-    IP_OBSERVATION_CRON: z.string().default('*/5 * * * *'),
-    PUBLIC_IPV4_URL: z.string().url().default('https://api.ipify.org'),
-    PUBLIC_IPV6_URL: z.string().url().default('https://api6.ipify.org')
+      )
   })
   .superRefine((value, context) => {
     if (value.COOKIE_SAME_SITE === 'none' && !value.COOKIE_SECURE) {
@@ -151,6 +156,10 @@ export type AppConfig = z.infer<typeof appConfigSchema>;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   return appConfigSchema.parse(env);
+}
+
+export function loadWorkerConfig(env: NodeJS.ProcessEnv = process.env): WorkerConfig {
+  return workerConfigSchema.parse(env);
 }
 
 export interface EncryptedSecret {

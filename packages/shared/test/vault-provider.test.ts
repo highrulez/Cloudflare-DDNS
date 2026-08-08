@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CloudflareAdapter, decryptCredential, encryptCredential } from '../src/index.js';
+import {
+  CloudflareAdapter,
+  decryptCredential,
+  encryptCredential,
+  loadWorkerConfig
+} from '../src/index.js';
 
 describe('credential vault', () => {
   const key = Buffer.alloc(32, 7);
@@ -16,6 +21,18 @@ describe('credential vault', () => {
   it('binds ciphertext to its connection through AAD', () => {
     const encrypted = encryptCredential({ apiToken: 'top-secret-1234' }, key, 'connection-1');
     expect(() => decryptCredential(encrypted, key, 'connection-2')).toThrow();
+  });
+});
+
+describe('worker configuration', () => {
+  it('does not require administrator credentials', () => {
+    const config = loadWorkerConfig({
+      DATABASE_URL: 'mysql://infrahub_app:password@192.168.68.100:3306/infrahub',
+      REDIS_URL: 'redis://:password@redis:6379',
+      APP_ENCRYPTION_KEY: Buffer.alloc(32, 3).toString('base64')
+    });
+    expect(config.DATABASE_URL).toContain('/infrahub');
+    expect(config.APP_ENCRYPTION_KEY).toHaveLength(32);
   });
 });
 

@@ -12,5 +12,4 @@ coverage/
 apps/api/generated/
 packages/database/generated/
 data/
-mysql-data/
 redis-data/

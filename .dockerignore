@@ -9,5 +9,4 @@ node_modules
 !.env.example
 *.log
 data
-mysql-data
 redis-data

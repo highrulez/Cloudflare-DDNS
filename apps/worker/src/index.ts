@@ -7,7 +7,7 @@ import { prisma, type Prisma } from '@infra-hub/database';
 import {
   createProviderRegistry,
   decryptCredential,
-  loadConfig,
+  loadWorkerConfig,
   ProviderError,
   type ProviderDiscovery
 } from '@infra-hub/shared';
@@ -25,7 +25,7 @@ const envFile = [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.
   existsSync
 );
 if (envFile) loadDotenv({ path: envFile, quiet: true });
-const config = loadConfig();
+const config = loadWorkerConfig();
 const connection = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
 const schedulerConnection = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
 const cacheConnection = new Redis(config.REDIS_URL);
