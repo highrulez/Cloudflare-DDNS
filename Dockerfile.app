@@ -4,6 +4,9 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 ENV CI=true
 RUN corepack enable
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
@@ -26,7 +29,7 @@ RUN DATABASE_URL="mysql://prisma_build:prisma_build@127.0.0.1:3306/prisma_build"
     && pnpm --filter @infra-hub/api deploy --prod --legacy /prod/api \
     && pnpm --filter @infra-hub/worker deploy --prod --legacy /prod/worker \
     && pnpm --filter @infra-hub/database deploy --prod --legacy /prod/database \
-    && generated_package="$(readlink -f /app/node_modules/@prisma/client)" \
+    && generated_package="$(readlink -f /app/packages/database/node_modules/@prisma/client)" \
     && generated_client="$(dirname "$(dirname "${generated_package}")")/.prisma" \
     && test -d "${generated_client}/client" \
     && for deployment in /prod/api /prod/worker /prod/database; do \
@@ -43,6 +46,9 @@ FROM node:24-bookworm-slim AS runtime
 ENV NODE_ENV=production
 ENV HOME=/home/node
 ENV TMPDIR=/tmp
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 USER node
