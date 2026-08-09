@@ -195,7 +195,7 @@ export type SystemOverview = {
     environment: string;
     configurationVersion: string;
     latestRelease: string | null;
-    startedAt: string;
+    startedAt: string | null;
   };
 };
 export type SystemSelfTest = {

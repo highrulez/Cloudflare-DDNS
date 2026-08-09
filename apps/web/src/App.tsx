@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './auth';
+import { RouteErrorBoundary } from './components/error-boundary';
 import { AppShell } from './components/shell';
 import { Loading } from './components/ui';
 import { HistoryPage, LoginPage, SettingsPage, SetupGuard } from './pages/core';
@@ -58,7 +59,14 @@ export default function App() {
           <Route path="/records" element={<RecordsPage />} />
           <Route path="/cloudflare" element={<CloudflarePage />} />
           <Route path="/history" element={<HistoryPage />} />
-          <Route path="/system" element={<SystemPage />} />
+          <Route
+            path="/system"
+            element={
+              <RouteErrorBoundary message="System information could not be displayed. Refresh the data or try again.">
+                <SystemPage />
+              </RouteErrorBoundary>
+            }
+          />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

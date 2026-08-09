@@ -35,9 +35,9 @@ import {
   PageTitle,
   SelectField,
   cx,
-  formatDate,
   useToast
 } from '../components/ui';
+import { safeFormatDate, safeRelativeTime } from '../utils/date';
 
 type Tab = 'overview' | 'tests' | 'logs';
 
@@ -172,7 +172,11 @@ export function SystemPage() {
           value={data.reverseProxy.warnings.length ? 'Needs attention' : 'Healthy'}
           state={data.reverseProxy.warnings.length ? 'warning' : 'healthy'}
         />
-        <Summary label="Last refreshed" value={relativeTime(data.generatedAt)} state="healthy" />
+        <Summary
+          label="Last refreshed"
+          value={safeRelativeTime(data.generatedAt)}
+          state="healthy"
+        />
       </div>
 
       <div className="flex gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
@@ -255,7 +259,7 @@ function Overview({
           provider={host(data.network.ipv6Provider)}
           latency={data.network.ipv6LatencyMs}
         />
-        <Row label="Last detection" value={formatDate(data.network.detectedAt ?? undefined)} />
+        <Row label="Last detection" value={safeFormatDate(data.network.detectedAt)} />
       </Section>
 
       <Section icon={<Server />} title="Synology" state="healthy">
@@ -308,7 +312,7 @@ function Overview({
         <Row label="API latency" value={`${data.cloudflare.latencyMs} ms`} chip />
         <Row
           label="Last successful request"
-          value={formatDate(data.cloudflare.lastSuccessfulRequest ?? undefined)}
+          value={safeFormatDate(data.cloudflare.lastSuccessfulRequest)}
         />
         <Permission label="Zone Read" state={data.cloudflare.permissions.zoneRead} />
         <Permission label="DNS Edit" state={data.cloudflare.permissions.dnsEdit} />
@@ -321,11 +325,11 @@ function Overview({
       >
         <Row label="Scheduler" value={data.ddns.scheduler} />
         <Row label="Check interval" value={`${data.ddns.intervalMinutes} minutes`} />
-        <Row label="Last run" value={formatDate(data.ddns.lastRunAt ?? undefined)} />
-        <Row label="Next run" value={formatDate(data.ddns.nextRunAt ?? undefined)} />
+        <Row label="Last run" value={safeFormatDate(data.ddns.lastRunAt)} />
+        <Row label="Next run" value={safeFormatDate(data.ddns.nextRunAt)} />
         <Row
           label="Last successful update"
-          value={formatDate(data.ddns.lastSuccessfulUpdate ?? undefined)}
+          value={safeFormatDate(data.ddns.lastSuccessfulUpdate)}
         />
         <Row label="Current lease owner" value={data.ddns.leaseOwner} mono />
         <Row label="Scheduler version" value={data.ddns.schedulerVersion} />
@@ -358,11 +362,11 @@ function Overview({
       <Section icon={<HardDrive />} title="Application" state="healthy">
         <Row label="Application version" value={data.application.version} />
         <Row label="Git commit" value={data.application.commit} mono />
-        <Row label="Build date" value={formatDate(data.application.buildDate ?? undefined)} />
+        <Row label="Build date" value={safeFormatDate(data.application.buildDate)} />
         <Row label="Environment" value={data.application.environment} />
         <Row label="Configuration version" value={data.application.configurationVersion} />
         <Row label="Latest release" value={data.application.latestRelease ?? 'Not checked'} />
-        <Row label="Started" value={formatDate(data.application.startedAt)} />
+        <Row label="Started" value={safeFormatDate(data.application.startedAt)} />
       </Section>
     </div>
   );
@@ -407,7 +411,7 @@ function SelfTests({
               <div>
                 <strong className="text-sm">{test.name}</strong>
                 <p className="text-xs text-slate-500">{test.message}</p>
-                <time className="text-xs text-slate-400">{formatDate(test.timestamp)}</time>
+                <time className="text-xs text-slate-400">{safeFormatDate(test.timestamp)}</time>
               </div>
               <span className="w-fit rounded-full bg-slate-100 px-2.5 py-1 font-mono text-xs dark:bg-slate-800">
                 {test.latencyMs} ms
@@ -482,7 +486,7 @@ function Logs({
         <div className="max-h-[680px] divide-y divide-slate-100 overflow-auto font-mono text-xs dark:divide-slate-800">
           {logs.map((entry) => (
             <div key={entry.id} className="grid gap-2 p-3 sm:grid-cols-[150px_90px_110px_1fr]">
-              <time className="text-slate-500">{new Date(entry.time).toLocaleString()}</time>
+              <time className="text-slate-500">{safeFormatDate(entry.time)}</time>
               <span className={levelColor(entry.level)}>{entry.level.toUpperCase()}</span>
               <span className="text-blue-600">{entry.category}</span>
               <div className="min-w-0">
@@ -661,10 +665,6 @@ function duration(seconds: number) {
   return [days ? `${days}d` : '', hours ? `${hours}h` : '', `${minutes}m`]
     .filter(Boolean)
     .join(' ');
-}
-function relativeTime(value: string) {
-  const seconds = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 1000));
-  return seconds < 60 ? `${seconds}s ago` : `${Math.round(seconds / 60)}m ago`;
 }
 function host(value: string | null) {
   if (!value) return 'No provider';

@@ -37,6 +37,21 @@ function elapsed(started: number) {
   return Math.max(0, Date.now() - started);
 }
 
+export function normalizeSystemTimestamp(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const normalized = value.trim();
+    if (!normalized || normalized.toLowerCase() === 'unknown') return null;
+    value = normalized;
+  }
+  try {
+    const date = value instanceof Date ? value : new Date(value as string | number);
+    return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function forwarded(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value?.split(',')[0]?.trim();
 }
@@ -309,7 +324,7 @@ export function registerSystemRoutes(
         ipv6Provider: resultFor('IPV6')?.provider ?? null,
         ipv4LatencyMs: resultFor('IPV4')?.durationMs ?? null,
         ipv6LatencyMs: resultFor('IPV6')?.durationMs ?? null,
-        detectedAt: latestIp?.finishedAt ?? null
+        detectedAt: normalizeSystemTimestamp(latestIp?.finishedAt)
       },
       synology: {
         hostname: os.hostname(),
@@ -328,13 +343,16 @@ export function registerSystemRoutes(
         platform: `${process.platform} ${process.arch}`
       },
       database,
-      cloudflare,
+      cloudflare: {
+        ...cloudflare,
+        lastSuccessfulRequest: normalizeSystemTimestamp(cloudflare.lastSuccessfulRequest)
+      },
       ddns: {
         scheduler: schedulerState?.lastError ? 'degraded' : 'running',
         intervalMinutes: settings.intervalMinutes,
-        lastRunAt: lastRun?.finishedAt ?? lastRun?.startedAt ?? null,
-        nextRunAt: schedulerState?.nextCheckAt ?? null,
-        lastSuccessfulUpdate: lastUpdate?.createdAt ?? null,
+        lastRunAt: normalizeSystemTimestamp(lastRun?.finishedAt ?? lastRun?.startedAt),
+        nextRunAt: normalizeSystemTimestamp(schedulerState?.nextCheckAt),
+        lastSuccessfulUpdate: normalizeSystemTimestamp(lastUpdate?.createdAt),
         leaseOwner: lease?.ownerId ?? schedulerState?.ownerId ?? scheduler.ownerId,
         schedulerVersion: process.env.CONFIG_VERSION ?? '1'
       },
@@ -342,11 +360,11 @@ export function registerSystemRoutes(
       application: {
         version: process.env.APP_VERSION ?? '1.0.0',
         commit: process.env.GIT_COMMIT ?? 'unknown',
-        buildDate: process.env.BUILD_DATE ?? null,
+        buildDate: normalizeSystemTimestamp(process.env.BUILD_DATE),
         environment: config.NODE_ENV,
         configurationVersion: process.env.CONFIG_VERSION ?? '1',
         latestRelease: process.env.LATEST_RELEASE ?? null,
-        startedAt
+        startedAt: normalizeSystemTimestamp(startedAt)
       }
     };
   });
