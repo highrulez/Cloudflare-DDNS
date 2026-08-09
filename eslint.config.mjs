@@ -5,7 +5,14 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/coverage/**', '**/generated/**', 'eslint.config.mjs']
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      '**/generated/**',
+      '**/*.config.js',
+      '**/*.config.cjs',
+      'eslint.config.mjs'
+    ]
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -22,9 +29,5 @@ export default tseslint.config(
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-floating-promises': 'error'
     }
-  },
-  {
-    files: ['scripts/*.mjs'],
-    ...tseslint.configs.disableTypeChecked
   }
 );

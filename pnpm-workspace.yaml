@@ -4,7 +4,7 @@ packages:
 
 allowBuilds:
   '@prisma/engines': true
+  '@prisma/client': true
   argon2: true
   esbuild: true
-  msgpackr-extract: true
   prisma: true

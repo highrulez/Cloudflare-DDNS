@@ -2,6 +2,50 @@ name: CI
 
 on:
   push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: root-password
+          MARIADB_DATABASE: cloudflare_ddns_test
+          MARIADB_USER: cloudflare_ddns
+          MARIADB_PASSWORD: test-password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: mysql://cloudflare_ddns:test-password@127.0.0.1:3306/cloudflare_ddns_test
+      ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      SESSION_SECRET: ci-session-secret-with-at-least-thirty-two-characters
+      APP_ORIGIN: http://127.0.0.1:3000
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: corepack enable
+      - run: corepack pnpm install --frozen-lockfile
+      - run: corepack pnpm db:generate
+      - run: corepack pnpm db:deploy
+      - run: corepack pnpm lint
+      - run: corepack pnpm typecheck
+      - run: corepack pnpm test
+      - run: corepack pnpm build
+name: CI
+
+on:
+  push:
     branches: [main]
   pull_request:
 

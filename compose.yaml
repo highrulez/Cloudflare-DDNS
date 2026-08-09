@@ -1,143 +1,80 @@
-name: infrastructure-hub
-
-x-app-environment: &app-environment
-  NODE_ENV: production
-  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
-  REDIS_URL: ${REDIS_URL:?Set REDIS_URL in .env}
-  APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:?Set APP_ENCRYPTION_KEY in .env}
-  APP_ENCRYPTION_KEY_VERSION: ${APP_ENCRYPTION_KEY_VERSION:-1}
-  CLOUDFLARE_API_BASE: ${CLOUDFLARE_API_BASE:-https://api.cloudflare.com/client/v4}
-  PUBLIC_IPV4_URL: ${PUBLIC_IPV4_URL:-https://api.ipify.org}
-  PUBLIC_IPV6_URL: ${PUBLIC_IPV6_URL:-https://api6.ipify.org}
-  LOG_LEVEL: ${LOG_LEVEL:-info}
-  DATABASE_CONNECT_TIMEOUT_MS: ${DATABASE_CONNECT_TIMEOUT_MS:-5000}
-  DATABASE_OPERATION_TIMEOUT_MS: ${DATABASE_OPERATION_TIMEOUT_MS:-5000}
-  REDIS_CONNECT_TIMEOUT_MS: ${REDIS_CONNECT_TIMEOUT_MS:-5000}
-  REDIS_COMMAND_TIMEOUT_MS: ${REDIS_COMMAND_TIMEOUT_MS:-3000}
+name: cloudflare-ddns-manager
 
 services:
-  web:
+  app:
     build:
       context: .
-      dockerfile: Dockerfile.web
-    ports:
-      - '${WEB_PORT:-8080}:8080'
-    depends_on:
-      api:
-        condition: service_healthy
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /var/cache/nginx
-      - /var/run
-      - /tmp
-    networks:
-      - frontend
-
-  api:
-    build:
-      context: .
-      dockerfile: Dockerfile.app
-      target: api
-    working_dir: /app
+      dockerfile: Dockerfile
     environment:
-      <<: *app-environment
-      API_HOST: 0.0.0.0
-      API_PORT: 3000
-      ADMIN_EMAIL: ${ADMIN_EMAIL:?Set ADMIN_EMAIL in .env}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080}
-      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-43200}
-      COOKIE_NAME: ${COOKIE_NAME:-infra_hub_session}
+      NODE_ENV: production
+      APP_PORT: ${APP_PORT:-3000}
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env}
+      TZ: ${TZ:-Asia/Kuala_Lumpur}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      COOKIE_NAME: ${COOKIE_NAME:-cloudflare_ddns_session}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
-      DB_STARTUP_MAX_ATTEMPTS: ${DB_STARTUP_MAX_ATTEMPTS:-60}
-      DB_STARTUP_RETRY_SECONDS: ${DB_STARTUP_RETRY_SECONDS:-2}
-      AUTH_PASSWORD_VERIFY_TIMEOUT_MS: ${AUTH_PASSWORD_VERIFY_TIMEOUT_MS:-15000}
-      AUTH_LOGIN_TIMEOUT_MS: ${AUTH_LOGIN_TIMEOUT_MS:-25000}
-    expose:
-      - '3000'
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-43200}
+      CLOUDFLARE_API_BASE: ${CLOUDFLARE_API_BASE:-https://api.cloudflare.com/client/v4}
+      IPV4_PROVIDERS: ${IPV4_PROVIDERS:-https://api.ipify.org,https://checkip.amazonaws.com,https://icanhazip.com}
+      IPV6_PROVIDERS: ${IPV6_PROVIDERS:-https://api6.ipify.org,https://icanhazip.com}
+      DATABASE_CONNECT_TIMEOUT_MS: ${DATABASE_CONNECT_TIMEOUT_MS:-5000}
+      DATABASE_QUERY_TIMEOUT_MS: ${DATABASE_QUERY_TIMEOUT_MS:-10000}
+      HTTP_TIMEOUT_MS: ${HTTP_TIMEOUT_MS:-10000}
+    ports:
+      - '${HOST_PORT:-8090}:${APP_PORT:-3000}'
     depends_on:
-      redis:
+      db:
         condition: service_healthy
     restart: unless-stopped
     init: true
-    security_opt:
-      - no-new-privileges:true
     read_only: true
     tmpfs:
       - /tmp
       - /home/node
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test:
         [
           'CMD',
           'node',
           '-e',
-          "fetch('http://127.0.0.1:3000/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:'+(process.env.APP_PORT||3000)+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
         ]
       interval: 15s
       timeout: 5s
       retries: 8
-      start_period: 30s
+      start_period: 45s
     networks:
-      - frontend
-      - backend
+      - app
 
-  worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.app
-      target: worker
-    working_dir: /app
+  db:
+    image: mariadb:10.11
     environment:
-      <<: *app-environment
-    depends_on:
-      api:
-        condition: service_healthy
-    restart: unless-stopped
-    init: true
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp
-      - /home/node
-    stop_grace_period: 30s
-    healthcheck:
-      test: ['CMD', 'node', '-e', "require('node:fs').accessSync('/tmp/infra-hub-worker-ready')"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    networks:
-      - backend
-
-  redis:
-    image: redis:7.4-alpine
-    environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in .env}
-    command:
-      - /bin/sh
-      - -c
-      - exec redis-server --appendonly yes --requirepass "$$REDIS_PASSWORD"
+      MARIADB_DATABASE: ${DB_NAME:-cloudflare_ddns}
+      MARIADB_USER: ${DB_USER:-cloudflare_ddns}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
+      TZ: ${TZ:-Asia/Kuala_Lumpur}
     volumes:
-      - redis-data:/data
+      - mariadb-data:/var/lib/mysql
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
     healthcheck:
-      test: ['CMD-SHELL', 'test "$$(redis-cli -a "$${REDIS_PASSWORD}" ping)" = PONG']
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
       interval: 10s
       timeout: 5s
-      retries: 12
+      retries: 20
+      start_period: 30s
     networks:
-      - backend
+      - app
 
 volumes:
-  redis-data:
+  mariadb-data:
 
 networks:
-  frontend:
-  backend:
+  app:

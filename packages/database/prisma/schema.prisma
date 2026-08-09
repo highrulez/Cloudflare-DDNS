@@ -1,203 +1,238 @@
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
 datasource db {
   provider = "mysql"
 }
 
-enum UserRole {
-  ADMIN
+enum RecordType {
+  A
+  AAAA
 }
-
-enum ConnectionStatus {
-  PENDING
-  CONNECTING
-  ACTIVE
-  DEGRADED
-  FAILED
-  REVOKED
+enum RecordHealth {
+  UNKNOWN
+  HEALTHY
+  DRIFTED
+  ERROR
+  DISABLED
 }
-
-enum CredentialStatus {
-  STAGED
-  ACTIVE
-  REVOKED
+enum IpFamily {
+  IPV4
+  IPV6
 }
-
-enum SyncStatus {
-  QUEUED
+enum RunTrigger {
+  SCHEDULED
+  MANUAL_CHECK
+  MANUAL_UPDATE
+  FORCE
+  SETUP
+}
+enum RunStatus {
   RUNNING
-  SUCCEEDED
+  SUCCESS
+  PARTIAL
   FAILED
+  SKIPPED
+}
+enum UpdateAction {
+  CHECKED
+  SKIPPED
+  UPDATED
+  CREATED
+  FAILED
+  DISABLED
+  NO_IP
+}
+enum UpdateResult {
+  SUCCESS
+  ERROR
+  UNCHANGED
 }
 
 model User {
-  id                  String               @id @default(cuid())
-  email               String               @unique @db.VarChar(254)
-  displayName         String               @db.VarChar(100)
-  passwordHash        String               @db.VarChar(255)
-  role                UserRole             @default(ADMIN)
-  mustChangePassword  Boolean              @default(true)
-  sessionVersion      Int                  @default(1)
-  providerConnections ProviderConnection[]
-  providerAccounts    ProviderAccount[]
-  auditEvents         AuditEvent[]
-  ddnsSelections      DdnsSelection[]
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id           String    @id @default(cuid())
+  username     String    @unique @db.VarChar(191)
+  passwordHash String    @db.VarChar(255)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  sessions     Session[]
 }
 
-model ProviderConnection {
-  id            String               @id @default(cuid())
-  userId        String
-  providerKey   String               @db.VarChar(32)
-  label         String               @db.VarChar(80)
-  status        ConnectionStatus     @default(PENDING)
-  statusMessage String?              @db.VarChar(500)
-  lastCheckedAt DateTime?
-  lastSyncedAt  DateTime?
-  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  credentials   ProviderCredential[]
-  accounts      ProviderAccount[]
-  syncRuns      SyncRun[]
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-
-  @@unique([userId, providerKey, label])
-  @@index([userId, status])
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @db.Char(64)
+  userId    String
+  expiresAt DateTime
+  lastSeenAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
 }
 
-model ProviderCredential {
-  id           String             @id @default(cuid())
-  connectionId String
-  status       CredentialStatus   @default(STAGED)
-  ciphertext   String             @db.Text
-  iv           String             @db.VarChar(64)
-  authTag      String             @db.VarChar(64)
-  keyVersion   Int                @default(1)
-  maskedHint   String             @db.VarChar(16)
-  verifiedAt   DateTime?
-  connection   ProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-
-  @@index([connectionId, status])
+model SetupState {
+  id          Int      @id @default(1)
+  step        Int      @default(1)
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
-model ProviderAccount {
-  id           String             @id @default(cuid())
-  userId       String
-  connectionId String
-  externalId   String             @db.VarChar(191)
-  name         String             @db.VarChar(191)
-  isSynthetic  Boolean            @default(false)
-  staleAt      DateTime?
-  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  connection   ProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  zones        DnsZone[]
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-
-  @@unique([connectionId, externalId])
-  @@index([userId, name])
+model CloudflareAccount {
+  id              String             @id @default(cuid())
+  name            String             @unique @db.VarChar(191)
+  tokenCiphertext Bytes
+  tokenIv         Bytes
+  tokenAuthTag    Bytes
+  tokenKeyVersion Int                @default(1)
+  tokenHint       String             @db.VarChar(32)
+  verifiedAt      DateTime?
+  lastError       String?            @db.Text
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  zones           CloudflareZone[]
+  records         ManagedDnsRecord[]
 }
 
-model DnsZone {
-  id          String          @id @default(cuid())
+model CloudflareZone {
+  id          String            @id @default(cuid())
   accountId   String
-  externalId  String          @db.VarChar(191)
-  name        String          @db.VarChar(253)
-  status      String?         @db.VarChar(32)
-  nameservers String?         @db.Text
-  staleAt     DateTime?
-  account     ProviderAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  records     DnsRecord[]
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-
-  @@unique([accountId, externalId])
+  cloudflareId String           @db.VarChar(64)
+  name        String            @db.VarChar(253)
+  status      String            @db.VarChar(32)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  account     CloudflareAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  records     ManagedDnsRecord[]
+  @@unique([accountId, cloudflareId])
   @@index([name])
 }
 
-model DnsRecord {
-  id         String         @id @default(cuid())
-  zoneId     String
-  externalId String         @db.VarChar(191)
-  type       String         @db.VarChar(16)
-  name       String         @db.VarChar(253)
-  content    String         @db.Text
-  ttl        Int
-  proxied    Boolean?
-  priority   Int?
-  staleAt    DateTime?
-  zone       DnsZone        @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  selection  DdnsSelection?
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-
-  @@unique([zoneId, externalId])
-  @@index([name, type])
+model ManagedDnsRecord {
+  id                  String            @id @default(cuid())
+  accountId           String
+  zoneId              String
+  cloudflareRecordId  String?           @db.VarChar(64)
+  type                RecordType
+  hostname            String            @db.VarChar(253)
+  normalizedHostname  String            @db.VarChar(253)
+  content             String?           @db.VarChar(45)
+  proxied             Boolean           @default(false)
+  ttl                 Int               @default(1)
+  enabled             Boolean           @default(true)
+  automatic           Boolean           @default(true)
+  health              RecordHealth      @default(UNKNOWN)
+  lastCheckedAt       DateTime?
+  lastUpdatedAt       DateTime?
+  lastError           String?           @db.Text
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  account             CloudflareAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  zone                CloudflareZone    @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  logs                DdnsUpdateLog[]
+  @@unique([accountId, zoneId, normalizedHostname, type])
+  @@index([enabled, type])
 }
 
-model DdnsSelection {
-  id        String    @id @default(cuid())
-  userId    String
-  recordId  String    @unique
-  enabled   Boolean   @default(true)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  record    DnsRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  @@index([userId, enabled])
+model AppSettings {
+  id                 Int      @id @default(1)
+  intervalMinutes    Int      @default(5)
+  ipv4Enabled        Boolean  @default(true)
+  ipv6Enabled        Boolean  @default(false)
+  automaticUpdates   Boolean  @default(true)
+  providerPolicy     String   @default("ordered") @db.VarChar(32)
+  ipv4Providers      Json?
+  ipv6Providers      Json?
+  requestTimeoutMs   Int      @default(5000)
+  retentionDays      Int      @default(90)
+  timezone           String   @default("Asia/Kuala_Lumpur") @db.VarChar(64)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
-model SyncRun {
-  id            String             @id @default(cuid())
-  connectionId  String
-  jobId         String?            @db.VarChar(191)
-  status        SyncStatus         @default(QUEUED)
-  accountsFound Int                @default(0)
-  zonesFound    Int                @default(0)
-  recordsFound  Int                @default(0)
-  errorMessage  String?            @db.Text
-  startedAt     DateTime?
-  completedAt   DateTime?
-  connection    ProviderConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
-  createdAt     DateTime           @default(now())
-
-  @@index([connectionId, createdAt])
+model IpDetectionRun {
+  id          String              @id @default(cuid())
+  ddnsRunId   String?
+  startedAt   DateTime            @default(now())
+  finishedAt  DateTime?
+  ipv4        String?             @db.VarChar(45)
+  ipv6        String?             @db.VarChar(45)
+  success     Boolean             @default(false)
+  ddnsRun     DdnsRun?            @relation(fields: [ddnsRunId], references: [id], onDelete: SetNull)
+  results     IpDetectionResult[]
+  @@index([startedAt])
 }
 
-model IpObservation {
-  id        String   @id @default(cuid())
-  address   String   @db.VarChar(45)
-  family    Int
-  source    String   @db.VarChar(64)
-  changed   Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  @@index([createdAt])
+model IpDetectionResult {
+  id          String         @id @default(cuid())
+  runId       String
+  family      IpFamily
+  provider    String         @db.VarChar(255)
+  success     Boolean
+  address     String?        @db.VarChar(45)
+  error       String?        @db.Text
+  durationMs  Int
+  createdAt   DateTime       @default(now())
+  run         IpDetectionRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  @@index([runId, family])
 }
 
-model AppSetting {
-  key       String   @id @db.VarChar(100)
-  value     String   @db.Text
-  updatedAt DateTime @updatedAt
+model DdnsRun {
+  id             String           @id @default(cuid())
+  trigger        RunTrigger
+  status         RunStatus        @default(RUNNING)
+  force          Boolean          @default(false)
+  startedAt      DateTime         @default(now())
+  finishedAt     DateTime?
+  recordsTotal   Int              @default(0)
+  recordsUpdated Int              @default(0)
+  recordsFailed  Int              @default(0)
+  summary        String?          @db.Text
+  ipRuns         IpDetectionRun[]
+  logs           DdnsUpdateLog[]
+  @@index([startedAt])
+  @@index([status])
 }
 
-model AuditEvent {
-  id         String   @id @default(cuid())
-  userId     String?
-  action     String   @db.VarChar(80)
-  entityType String?  @db.VarChar(80)
-  entityId   String?  @db.VarChar(191)
-  message    String   @db.VarChar(500)
-  metadata   String?  @db.Text
-  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
-  createdAt  DateTime @default(now())
+model DdnsUpdateLog {
+  id               String            @id @default(cuid())
+  runId            String
+  recordId         String?
+  hostname         String            @db.VarChar(253)
+  type             RecordType
+  previousIp       String?           @db.VarChar(45)
+  newIp            String?           @db.VarChar(45)
+  action           UpdateAction
+  result           UpdateResult
+  providerRequestId String?          @db.VarChar(128)
+  providerResponse String?           @db.Text
+  error            String?           @db.Text
+  durationMs       Int
+  createdAt        DateTime          @default(now())
+  run              DdnsRun           @relation(fields: [runId], references: [id], onDelete: Cascade)
+  record           ManagedDnsRecord? @relation(fields: [recordId], references: [id], onDelete: SetNull)
+  @@index([runId])
+  @@index([recordId, createdAt])
+  @@index([result, createdAt])
+}
 
-  @@index([userId, createdAt])
-  @@index([createdAt])
+model SchedulerLease {
+  name          String   @id @db.VarChar(64)
+  ownerId       String   @db.VarChar(128)
+  leaseExpiresAt DateTime
+  heartbeatAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SchedulerState {
+  id          Int      @id @default(1)
+  ownerId     String?  @db.VarChar(128)
+  running     Boolean  @default(false)
+  lastCheckAt DateTime?
+  nextCheckAt DateTime?
+  lastRunId   String?  @db.VarChar(191)
+  lastError   String?  @db.Text
+  updatedAt   DateTime @updatedAt
 }

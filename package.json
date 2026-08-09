@@ -1,23 +1,22 @@
 {
-  "name": "infrastructure-hub",
-  "version": "0.1.0",
+  "name": "cloudflare-ddns-manager",
+  "version": "1.0.0",
   "private": true,
   "packageManager": "pnpm@11.20.0",
   "engines": {
     "node": ">=22.0.0"
   },
   "scripts": {
+    "dev": "corepack pnpm --parallel --filter @ddns/server --filter @ddns/web dev",
     "build": "corepack pnpm -r --if-present build",
-    "dev": "corepack pnpm --parallel --filter @infra-hub/api --filter @infra-hub/worker --filter @infra-hub/web dev",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "corepack pnpm -r --if-present typecheck",
     "test": "corepack pnpm -r --if-present test",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "smoke:auth": "node scripts/smoke-auth.mjs",
-    "db:generate": "corepack pnpm --filter @infra-hub/database prisma:generate",
-    "db:migrate": "corepack pnpm --filter @infra-hub/database prisma:migrate",
-    "db:deploy": "corepack pnpm --filter @infra-hub/database prisma:deploy"
+    "db:generate": "corepack pnpm --filter @ddns/database prisma:generate",
+    "db:migrate": "corepack pnpm --filter @ddns/database prisma:migrate",
+    "db:deploy": "corepack pnpm --filter @ddns/database prisma:deploy"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

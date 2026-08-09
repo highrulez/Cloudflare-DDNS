@@ -6,10 +6,7 @@ coverage/
 .env
 .env.*
 !.env.example
-.env.example
-.gitignore
-.dockerignore
-Dockerfile*
-docker/*.conf
+pnpm-lock.yaml
+Dockerfile
 docker/*.sh
 **/*.prisma

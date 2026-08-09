@@ -1,0 +1,24 @@
+{
+  "name": "@ddns/server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsup",
+    "start": "node dist/server.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ddns/database": "workspace:*",
+    "@ddns/shared": "workspace:*",
+    "@fastify/cookie": "^11.1.2",
+    "@fastify/helmet": "^13.1.0",
+    "argon2": "^0.45.1",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.11.2",
+    "ipaddr.js": "^2.2.0",
+    "zod": "^4.4.3"
+  }
+}

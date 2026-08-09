@@ -1,12 +1,13 @@
 .git
+.github
 .cursor
 node_modules
 **/node_modules
 **/dist
-**/coverage
+coverage
 .env
 .env.*
 !.env.example
 *.log
-data
-redis-data
+*.tsbuildinfo
+db-data
