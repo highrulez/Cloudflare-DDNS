@@ -1,6 +1,9 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import type { PrismaClient } from "@ddns/database";
 import cookie from "@fastify/cookie";
 import helmet from "@fastify/helmet";
+import staticFiles from "@fastify/static";
 import Fastify from "fastify";
 import { ZodError } from "zod";
 import type { Config } from "./config.js";
@@ -30,11 +33,20 @@ export async function buildApp(db: PrismaClient, config: Config, options: { star
   registerAuthRoutes(app, db, config);
   registerCloudflareRoutes(app, db, config);
   registerRecordRoutes(app, db, config, engine, scheduler);
-  registerOperationRoutes(app, db, engine, scheduler);
+  registerOperationRoutes(app, db, config, engine, scheduler);
 
-  app.setNotFoundHandler((request, reply) =>
-    reply.code(404).send({ error: { code: "NOT_FOUND", message: `No route for ${request.method} ${request.url}` } }),
-  );
+  const webRoot = resolve(process.env.WEB_ROOT ?? "public");
+  if (existsSync(webRoot)) {
+    await app.register(staticFiles, { root: webRoot, wildcard: false });
+  }
+  app.setNotFoundHandler((request, reply) => {
+    if (existsSync(webRoot) && request.method === "GET" && !request.url.startsWith("/api/")) {
+      return reply.sendFile("index.html");
+    }
+    return reply.code(404).send({
+      error: { code: "NOT_FOUND", message: `No route for ${request.method} ${request.url}` },
+    });
+  });
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {
       return reply.code(400).send({
@@ -42,6 +54,11 @@ export async function buildApp(db: PrismaClient, config: Config, options: { star
       });
     }
     const caught = error instanceof Error ? error : new Error("Unknown server error");
+    if ("code" in caught && caught.code === "P2002") {
+      return reply.code(409).send({
+        error: { code: "DUPLICATE", message: "A record with the same account, zone, hostname, and type already exists" },
+      });
+    }
     const statusCode = "status" in caught && typeof caught.status === "number" ? caught.status : 500;
     if (statusCode >= 500) app.log.error(error);
     return reply.code(statusCode).send({

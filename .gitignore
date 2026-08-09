@@ -10,3 +10,4 @@ coverage/
 .cursor/
 .vscode/
 db-data/
+.verify/

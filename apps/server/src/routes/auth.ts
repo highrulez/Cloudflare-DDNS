@@ -2,6 +2,7 @@ import argon2 from "argon2";
 import type { PrismaClient } from "@ddns/database";
 import { loginSchema } from "@ddns/shared";
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import type { Config } from "../config.js";
 import { sessionHash } from "../security/crypto.js";
 import {
@@ -33,16 +34,46 @@ export function registerAuthRoutes(app: FastifyInstance, db: PrismaClient, confi
     }
     limiter.clear(key);
     const session = await createSession(db, config, user.id);
-    setSessionCookie(reply, session.token, session.expiresAt, config.NODE_ENV === "production");
+    setSessionCookie(reply, config, session.token, session.expiresAt);
     return { user: { id: user.id, username: user.username } };
   });
 
   app.post("/api/auth/logout", { preHandler: requireAuth }, async (request, reply) => {
-    const token = request.cookies.ddns_session;
+    const token = request.cookies[config.COOKIE_NAME];
     if (token) await db.session.deleteMany({ where: { tokenHash: sessionHash(token, config.SESSION_SECRET) } });
-    clearSessionCookie(reply);
+    clearSessionCookie(reply, config);
     return reply.code(204).send();
   });
 
-  app.get("/api/auth/me", { preHandler: requireAuth }, async (request) => ({ user: request.authUser }));
+  app.get("/api/auth/me", { preHandler: requireAuth }, (request) => ({ user: request.authUser }));
+
+  app.patch("/api/auth/profile", { preHandler: requireAuth }, async (request) => {
+    const input = z.object({ username: z.string().trim().min(1).max(191) }).parse(request.body);
+    const user = await db.user.update({
+      where: { id: request.authUser!.id },
+      data: { username: input.username },
+      select: { id: true, username: true },
+    });
+    return { user };
+  });
+
+  app.put("/api/auth/password", { preHandler: requireAuth }, async (request, reply) => {
+    const input = z.object({
+      currentPassword: z.string().min(1).max(256),
+      newPassword: z.string().min(12).max(256),
+    }).parse(request.body);
+    const user = await db.user.findUnique({ where: { id: request.authUser!.id } });
+    if (!user || !(await argon2.verify(user.passwordHash, input.currentPassword))) {
+      return reply.code(400).send({
+        error: { code: "INVALID_PASSWORD", message: "Current password is incorrect" },
+      });
+    }
+    await db.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await argon2.hash(input.newPassword, { type: argon2.argon2id }) },
+    });
+    await db.session.deleteMany({ where: { userId: user.id } });
+    clearSessionCookie(reply, config);
+    return reply.code(204).send();
+  });
 }

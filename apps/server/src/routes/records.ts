@@ -22,7 +22,10 @@ async function cloudflareContext(db: PrismaClient, config: Config, accountId: st
     ciphertext: Buffer.from(account.tokenCiphertext), iv: Buffer.from(account.tokenIv),
     authTag: Buffer.from(account.tokenAuthTag), keyVersion: account.tokenKeyVersion,
   }, config.ENCRYPTION_KEY);
-  return { zone, client: new CloudflareClient(token) };
+  return {
+    zone,
+    client: new CloudflareClient(token, fetch, config.HTTP_TIMEOUT_MS, 4, config.CLOUDFLARE_API_BASE),
+  };
 }
 
 export function registerRecordRoutes(
@@ -75,6 +78,7 @@ export function registerRecordRoutes(
         type: input.type, hostname, normalizedHostname: hostname, content: remote.content,
         proxied: remote.proxied, ttl: remote.ttl, enabled: input.enabled, automatic: input.automatic,
       },
+      include: { zone: true },
     });
     return reply.code(201).send(record);
   });
@@ -85,6 +89,15 @@ export function registerRecordRoutes(
     const current = await db.managedDnsRecord.findUnique({ where: { id } });
     if (!current) return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Record not found" } });
     const hostname = input.hostname?.toLowerCase().replace(/\.$/, "");
+    if (current.cloudflareRecordId && (hostname || input.proxied !== undefined || input.ttl !== undefined)) {
+      const context = await cloudflareContext(db, config, current.accountId, current.zoneId, reply);
+      if (!context) return;
+      await context.client.patchRecord(context.zone.cloudflareId, current.cloudflareRecordId, {
+        ...(hostname ? { name: hostname } : {}),
+        ...(input.proxied !== undefined ? { proxied: input.proxied } : {}),
+        ...(input.ttl !== undefined ? { ttl: input.ttl } : {}),
+      });
+    }
     return db.managedDnsRecord.update({
       where: { id },
       data: {
@@ -94,6 +107,7 @@ export function registerRecordRoutes(
         ...(input.proxied !== undefined ? { proxied: input.proxied } : {}),
         ...(input.ttl !== undefined ? { ttl: input.ttl } : {}),
       },
+      include: { zone: true },
     });
   });
 
@@ -109,6 +123,17 @@ export function registerRecordRoutes(
     };
   app.post("/api/records/:id/check", { preHandler: requireAuth }, runRecord("MANUAL_CHECK"));
   app.post("/api/records/:id/update", { preHandler: requireAuth }, runRecord("MANUAL_UPDATE"));
+  app.post("/api/records/:id/force", { preHandler: requireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!(await db.managedDnsRecord.findUnique({ where: { id } }))) {
+      return reply.code(404).send({ error: { code: "NOT_FOUND", message: "Record not found" } });
+    }
+    const result = await scheduler.runExclusive(() => engine.run({ trigger: "FORCE", recordId: id, force: true }));
+    if (!result) {
+      return reply.code(409).send({ error: { code: "RUN_IN_PROGRESS", message: "Another DDNS run is active" } });
+    }
+    return result;
+  });
 
   app.delete("/api/records/:id", { preHandler: requireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };

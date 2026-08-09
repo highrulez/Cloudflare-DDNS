@@ -6,6 +6,7 @@ export class Scheduler {
   readonly ownerId = `${process.pid}-${randomUUID()}`;
   private timer?: NodeJS.Timeout;
   private running = false;
+  private leaseBusy = false;
 
   constructor(private readonly db: PrismaClient, private readonly engine: DdnsEngine) {}
 
@@ -30,10 +31,22 @@ export class Scheduler {
   }
 
   async runExclusive<T>(task: () => Promise<T>): Promise<T | null> {
+    if (this.leaseBusy) return null;
     if (!(await this.acquire())) return null;
+    this.leaseBusy = true;
+    const heartbeat = setInterval(() => {
+      const now = new Date();
+      void this.db.schedulerLease.updateMany({
+        where: { name: "ddns", ownerId: this.ownerId },
+        data: { heartbeatAt: now, leaseExpiresAt: new Date(now.getTime() + 120_000) },
+      });
+    }, 30_000);
+    heartbeat.unref();
     try {
       return await task();
     } finally {
+      clearInterval(heartbeat);
+      this.leaseBusy = false;
       await this.release();
     }
   }
@@ -46,7 +59,14 @@ export class Scheduler {
       const state = await this.db.schedulerState.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} });
       if (!settings.automaticUpdates || (state.nextCheckAt && state.nextCheckAt > new Date())) return;
       const nextCheckAt = new Date(Date.now() + settings.intervalMinutes * 60_000);
-      const result = await this.runExclusive(() => this.engine.run({ trigger: "SCHEDULED" }));
+      const result = await this.runExclusive(async () => {
+        await this.db.schedulerState.upsert({
+          where: { id: 1 },
+          create: { id: 1, ownerId: this.ownerId, running: true },
+          update: { ownerId: this.ownerId, running: true, lastError: null },
+        });
+        return this.engine.run({ trigger: "SCHEDULED" });
+      });
       await this.db.schedulerState.update({
         where: { id: 1 },
         data: {

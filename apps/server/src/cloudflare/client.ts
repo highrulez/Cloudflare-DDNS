@@ -42,13 +42,14 @@ export class CloudflareClient {
     private readonly fetcher: typeof fetch = fetch,
     private readonly timeoutMs = 8_000,
     private readonly maxAttempts = 4,
+    private readonly apiBase = API,
   ) {}
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<{ data: T; requestId?: string }> {
     let lastError: unknown;
     for (let attempt = 0; attempt < this.maxAttempts; attempt += 1) {
       try {
-        const response = await this.fetcher(`${API}${path}`, {
+        const response = await this.fetcher(`${this.apiBase.replace(/\/$/, "")}${path}`, {
           ...init,
           signal: AbortSignal.timeout(this.timeoutMs),
           headers: {
@@ -99,7 +100,7 @@ export class CloudflareClient {
     const records: CloudflareRecordDto[] = [];
     for (let page = 1; ; page += 1) {
       const response = await this.request<CloudflareRecordDto[]>(
-        `/zones/${encodeURIComponent(zoneId)}/dns_records?type=A%2CAAAA&page=${page}&per_page=100`,
+        `/zones/${encodeURIComponent(zoneId)}/dns_records?page=${page}&per_page=100`,
       );
       records.push(...response.data.filter((record) => record.type === "A" || record.type === "AAAA"));
       if (response.data.length < 100) return records;
@@ -119,10 +120,14 @@ export class CloudflareClient {
     });
   }
 
-  async patchRecord(zoneId: string, recordId: string, content: string) {
+  async patchRecord(
+    zoneId: string,
+    recordId: string,
+    update: string | Partial<Pick<CloudflareRecordDto, "name" | "content" | "proxied" | "ttl">>,
+  ) {
     return this.request<CloudflareRecordDto>(
       `/zones/${encodeURIComponent(zoneId)}/dns_records/${encodeURIComponent(recordId)}`,
-      { method: "PATCH", body: JSON.stringify({ content }) },
+      { method: "PATCH", body: JSON.stringify(typeof update === "string" ? { content: update } : update) },
     );
   }
 }

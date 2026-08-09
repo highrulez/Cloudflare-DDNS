@@ -6,5 +6,6 @@ export default defineConfig({
   target: "node22",
   sourcemap: true,
   clean: true,
-  bundle: false,
+  bundle: true,
+  noExternal: ["@ddns/database", "@ddns/shared"],
 });

@@ -14,8 +14,20 @@ const schema = z.object({
     }
     return key;
   }),
-  PUBLIC_ORIGIN: z.string().url().optional(),
-  SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(720).default(168),
+  APP_ORIGIN: z.string().url().optional(),
+  COOKIE_NAME: z.string().min(1).default("cloudflare_ddns_session"),
+  COOKIE_SECURE: z.stringbool().default(false),
+  SESSION_TTL_SECONDS: z.coerce.number().int().min(300).max(2_592_000).default(43_200),
+  CLOUDFLARE_API_BASE: z.string().url().default("https://api.cloudflare.com/client/v4"),
+  IPV4_PROVIDERS: z
+    .string()
+    .default("https://api.ipify.org,https://checkip.amazonaws.com,https://icanhazip.com")
+    .transform((value) => value.split(",").map((item) => item.trim()).filter(Boolean)),
+  IPV6_PROVIDERS: z
+    .string()
+    .default("https://api6.ipify.org,https://icanhazip.com")
+    .transform((value) => value.split(",").map((item) => item.trim()).filter(Boolean)),
+  HTTP_TIMEOUT_MS: z.coerce.number().int().min(500).max(60_000).default(10_000),
 });
 
 export type Config = z.infer<typeof schema>;

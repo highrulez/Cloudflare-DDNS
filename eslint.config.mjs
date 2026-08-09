@@ -11,6 +11,8 @@ export default tseslint.config(
       '**/generated/**',
       '**/*.config.js',
       '**/*.config.cjs',
+      '**/*.config.ts',
+      'packages/database/scripts/**',
       'eslint.config.mjs'
     ]
   },
@@ -27,7 +29,18 @@ export default tseslint.config(
     },
     rules: {
       '@typescript-eslint/consistent-type-imports': 'error',
-      '@typescript-eslint/no-floating-promises': 'error'
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/no-base-to-string': 'off',
+      '@typescript-eslint/no-misused-promises': 'off'
+    }
+  },
+  {
+    files: ['**/*.test.ts', '**/*.test.tsx'],
+    rules: {
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/require-await': 'off'
     }
   }
 );

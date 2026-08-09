@@ -21,14 +21,7 @@ COPY packages packages
 RUN DATABASE_URL="mysql://build:build@127.0.0.1:3306/build" pnpm db:generate \
     && pnpm build \
     && pnpm --filter @ddns/server deploy --prod --legacy /output/server \
-    && pnpm --filter @ddns/database deploy --prod --legacy /output/database \
-    && generated_package="$(readlink -f /workspace/packages/database/node_modules/@prisma/client)" \
-    && generated_client="$(dirname "$(dirname "${generated_package}")")/.prisma" \
-    && for deployment in /output/server /output/database; do \
-         client_package="$(readlink -f "${deployment}/node_modules/@prisma/client")"; \
-         target_modules="$(dirname "$(dirname "${client_package}")")"; \
-         cp -R "${generated_client}" "${target_modules}/.prisma"; \
-       done
+    && pnpm --filter @ddns/database deploy --prod --legacy /output/database
 
 FROM node:24-bookworm-slim AS runtime
 
@@ -51,7 +44,7 @@ COPY --from=build /output/database/scripts ./database/scripts
 COPY --from=build /output/database/node_modules ./database/node_modules
 COPY --chmod=755 docker/start.sh /usr/local/bin/start-cloudflare-ddns
 
-RUN node -e "['fastify','@fastify/cookie','@fastify/static','argon2','mariadb','@prisma/client','zod','dotenv'].forEach(require.resolve); require('@prisma/client'); console.log('Runtime dependencies OK')"
+RUN node -e "['fastify','@fastify/cookie','@fastify/helmet','@fastify/static','argon2','mariadb','@prisma/adapter-mariadb','@prisma/client','zod','dotenv'].forEach(require.resolve); console.log('Runtime dependencies OK')"
 
 USER node
 EXPOSE 3000

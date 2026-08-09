@@ -25,7 +25,10 @@ async function clientFor(db: PrismaClient, config: Config, id: string, reply: Fa
     authTag: Buffer.from(account.tokenAuthTag),
     keyVersion: account.tokenKeyVersion,
   }, config.ENCRYPTION_KEY);
-  return { account, client: new CloudflareClient(token) };
+  return {
+    account,
+    client: new CloudflareClient(token, fetch, config.HTTP_TIMEOUT_MS, 4, config.CLOUDFLARE_API_BASE),
+  };
 }
 
 export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient, config: Config) {
@@ -43,7 +46,7 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
 
   app.post("/api/cloudflare/accounts", { preHandler: requireAuth }, async (request, reply) => {
     const input = cloudflareAccountSchema.parse(request.body);
-    const client = new CloudflareClient(input.token);
+    const client = new CloudflareClient(input.token, fetch, config.HTTP_TIMEOUT_MS, 4, config.CLOUDFLARE_API_BASE);
     await client.verifyToken();
     const zones = await client.listZones();
     const encrypted = encryptSecret(input.token, config.ENCRYPTION_KEY);
@@ -65,7 +68,7 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
 
   app.post("/api/cloudflare/accounts/test", { preHandler: requireAuth }, async (request) => {
     const input = cloudflareAccountSchema.parse(request.body);
-    const client = new CloudflareClient(input.token);
+    const client = new CloudflareClient(input.token, fetch, config.HTTP_TIMEOUT_MS, 4, config.CLOUDFLARE_API_BASE);
     const [verification, zones] = await Promise.all([client.verifyToken(), client.listZones()]);
     return { valid: verification.status === "active", zones };
   });
@@ -79,11 +82,11 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
     return { valid: verification.status === "active" };
   });
 
-  app.put("/api/cloudflare/accounts/:id/token", { preHandler: requireAuth }, async (request, reply) => {
+  app.put("/api/cloudflare/accounts/:id/token", { preHandler: requireAuth }, async (request) => {
     const { id } = request.params as { id: string };
     const token = (request.body as { token?: unknown })?.token;
     const input = cloudflareAccountSchema.pick({ token: true }).parse({ token });
-    const client = new CloudflareClient(input.token);
+    const client = new CloudflareClient(input.token, fetch, config.HTTP_TIMEOUT_MS, 4, config.CLOUDFLARE_API_BASE);
     await client.verifyToken();
     const encrypted = encryptSecret(input.token, config.ENCRYPTION_KEY);
     const account = await db.cloudflareAccount.update({
@@ -97,6 +100,44 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
       select: { id: true, name: true, tokenHint: true, verifiedAt: true, lastError: true, createdAt: true, updatedAt: true },
     });
     return account;
+  });
+
+  app.patch("/api/cloudflare/accounts/:id", { preHandler: requireAuth }, async (request) => {
+    const { id } = request.params as { id: string };
+    const input = cloudflareAccountSchema.partial().parse(request.body);
+    let tokenData = {};
+    if (input.token) {
+      const client = new CloudflareClient(input.token, fetch, config.HTTP_TIMEOUT_MS, 4, config.CLOUDFLARE_API_BASE);
+      await client.verifyToken();
+      const encrypted = encryptSecret(input.token, config.ENCRYPTION_KEY);
+      tokenData = {
+        tokenCiphertext: new Uint8Array(encrypted.ciphertext),
+        tokenIv: new Uint8Array(encrypted.iv),
+        tokenAuthTag: new Uint8Array(encrypted.authTag),
+        tokenKeyVersion: encrypted.keyVersion,
+        tokenHint: encrypted.hint,
+        verifiedAt: new Date(),
+        lastError: null,
+      };
+    }
+    return db.cloudflareAccount.update({
+      where: { id },
+      data: {
+        ...(input.name ? { name: input.name } : {}),
+        ...tokenData,
+      },
+      select: {
+        id: true,
+        name: true,
+        tokenHint: true,
+        verifiedAt: true,
+        lastError: true,
+        createdAt: true,
+        updatedAt: true,
+        zones: true,
+        _count: { select: { records: true } },
+      },
+    });
   });
 
   app.post("/api/cloudflare/accounts/:id/zones/refresh", { preHandler: requireAuth }, async (request, reply) => {

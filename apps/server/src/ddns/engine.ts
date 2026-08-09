@@ -45,7 +45,13 @@ export class DdnsEngine {
       for (const family of enabledFamilies) {
         const configured = family === "IPV4" ? settings.ipv4Providers : settings.ipv6Providers;
         const providers = Array.isArray(configured) ? configured.filter((item): item is string => typeof item === "string") : undefined;
-        const outcome = await detectPublicIp(family, providers?.length ? providers : undefined, this.fetcher, settings.requestTimeoutMs);
+        const fallbackProviders = family === "IPV4" ? this.config.IPV4_PROVIDERS : this.config.IPV6_PROVIDERS;
+        const outcome = await detectPublicIp(
+          family,
+          providers?.length ? providers : fallbackProviders,
+          this.fetcher,
+          settings.requestTimeoutMs,
+        );
         if (outcome.address) detected.set(family, outcome.address);
         await this.db.ipDetectionResult.createMany({
           data: outcome.attempts.map((attempt) => ({
@@ -112,7 +118,13 @@ export class DdnsEngine {
             },
             this.config.ENCRYPTION_KEY,
           );
-          const client = new CloudflareClient(token, this.fetcher, settings.requestTimeoutMs);
+          const client = new CloudflareClient(
+            token,
+            this.fetcher,
+            settings.requestTimeoutMs,
+            4,
+            this.config.CLOUDFLARE_API_BASE,
+          );
           const remote = await client.getRecord(record.zone.cloudflareId, record.cloudflareRecordId);
           const action = decideUpdate(remote.content, address, force, checkOnly || !settings.automaticUpdates || !record.automatic);
           let requestId: string | undefined;

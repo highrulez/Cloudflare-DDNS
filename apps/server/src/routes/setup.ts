@@ -4,6 +4,7 @@ import { adminSetupSchema, cloudflareAccountSchema, recordInputSchema, settingsS
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { Config } from "../config.js";
 import { CloudflareClient } from "../cloudflare/client.js";
+import { parsePublicAddress } from "../ip/detection.js";
 import { encryptSecret } from "../security/crypto.js";
 
 async function ensureSetupOpen(db: PrismaClient, reply: FastifyReply) {
@@ -44,9 +45,10 @@ export function registerSetupRoutes(app: FastifyInstance, db: PrismaClient, conf
     }
   });
 
-  app.post("/api/setup/cloudflare/test", async (request) => {
+  app.post("/api/setup/cloudflare/test", async (request, reply) => {
+    if (!(await ensureSetupOpen(db, reply))) return;
     const input = cloudflareAccountSchema.parse(request.body);
-    const client = new CloudflareClient(input.token);
+    const client = new CloudflareClient(input.token, fetch, config.HTTP_TIMEOUT_MS, 4, config.CLOUDFLARE_API_BASE);
     const [verification, zones] = await Promise.all([client.verifyToken(), client.listZones()]);
     return { valid: verification.status === "active", zones };
   });
@@ -54,7 +56,7 @@ export function registerSetupRoutes(app: FastifyInstance, db: PrismaClient, conf
   app.post("/api/setup/cloudflare", async (request, reply) => {
     if (!(await ensureSetupOpen(db, reply))) return;
     const input = cloudflareAccountSchema.parse(request.body);
-    const client = new CloudflareClient(input.token);
+    const client = new CloudflareClient(input.token, fetch, config.HTTP_TIMEOUT_MS, 4, config.CLOUDFLARE_API_BASE);
     await client.verifyToken();
     const zones = await client.listZones();
     const encrypted = encryptSecret(input.token, config.ENCRYPTION_KEY);
@@ -89,14 +91,15 @@ export function registerSetupRoutes(app: FastifyInstance, db: PrismaClient, conf
       authTag: Buffer.from(account.tokenAuthTag),
       keyVersion: account.tokenKeyVersion,
     }, config.ENCRYPTION_KEY);
-    const client = new CloudflareClient(token);
+    const client = new CloudflareClient(token, fetch, config.HTTP_TIMEOUT_MS, 4, config.CLOUDFLARE_API_BASE);
     let cloudflareRecordId = input.cloudflareRecordId ?? null;
     if (!cloudflareRecordId) {
       if (!input.content) return reply.code(400).send({ error: { code: "CONTENT_REQUIRED", message: "An initial IP is required" } });
+      const content = parsePublicAddress(input.content, input.type === "A" ? "IPV4" : "IPV6");
       const created = await client.createRecord(zone.cloudflareId, {
         type: input.type,
         name: input.hostname.toLowerCase(),
-        content: input.content,
+        content,
         proxied: input.proxied,
         ttl: input.ttl,
       });

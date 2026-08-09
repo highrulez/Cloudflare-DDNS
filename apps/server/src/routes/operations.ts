@@ -1,12 +1,19 @@
 import type { Prisma, PrismaClient, RunTrigger } from "@ddns/database";
 import { historyQuerySchema, paginationSchema, settingsSchema } from "@ddns/shared";
 import type { FastifyInstance, FastifyReply } from "fastify";
+import type { Config } from "../config.js";
 import type { DdnsEngine } from "../ddns/engine.js";
 import type { Scheduler } from "../ddns/scheduler.js";
 import { detectPublicIp } from "../ip/detection.js";
 import { requireAuth } from "../security/sessions.js";
 
-export function registerOperationRoutes(app: FastifyInstance, db: PrismaClient, engine: DdnsEngine, scheduler: Scheduler) {
+export function registerOperationRoutes(
+  app: FastifyInstance,
+  db: PrismaClient,
+  config: Config,
+  engine: DdnsEngine,
+  scheduler: Scheduler,
+) {
   app.get("/api/health", async (_request, reply) => {
     try {
       await db.$queryRaw`SELECT 1`;
@@ -60,7 +67,13 @@ export function registerOperationRoutes(app: FastifyInstance, db: PrismaClient, 
     const outcomes = [];
     for (const family of ["IPV4", "IPV6"] as const) {
       if ((family === "IPV4" && !settings.ipv4Enabled) || (family === "IPV6" && !settings.ipv6Enabled)) continue;
-      const outcome = await detectPublicIp(family, undefined, fetch, settings.requestTimeoutMs);
+      const configured = family === "IPV4" ? settings.ipv4Providers : settings.ipv6Providers;
+      const providers = Array.isArray(configured)
+        ? configured.filter((item): item is string => typeof item === "string")
+        : family === "IPV4"
+          ? config.IPV4_PROVIDERS
+          : config.IPV6_PROVIDERS;
+      const outcome = await detectPublicIp(family, providers, fetch, settings.requestTimeoutMs);
       outcomes.push({ family, ...outcome });
       await db.ipDetectionResult.createMany({
         data: outcome.attempts.map((attempt) => ({
@@ -94,7 +107,7 @@ export function registerOperationRoutes(app: FastifyInstance, db: PrismaClient, 
 
   app.get("/api/history/runs", { preHandler: requireAuth }, async (request) => {
     const query = historyQuerySchema.parse(request.query);
-    const where: Prisma.DdnsUpdateLogWhereInput = {
+    const where: Prisma.DdnsRunWhereInput = {
       ...(query.status ? { status: query.status } : {}),
       ...(query.trigger ? { trigger: query.trigger } : {}),
       ...(query.recordId ? { logs: { some: { recordId: query.recordId } } } : {}),
@@ -112,9 +125,24 @@ export function registerOperationRoutes(app: FastifyInstance, db: PrismaClient, 
   app.get("/api/history/logs", { preHandler: requireAuth }, async (request) => {
     const raw = request.query as Record<string, unknown>;
     const query = paginationSchema.parse(raw);
-    const where = {
+    let action: Prisma.DdnsUpdateLogWhereInput["action"];
+    if (raw.action === "check") action = { in: ["CHECKED", "SKIPPED"] };
+    if (raw.action === "update" || raw.action === "force-update") action = "UPDATED";
+    const result =
+      raw.status === "success"
+        ? "SUCCESS"
+        : raw.status === "failed"
+          ? "ERROR"
+          : raw.status === "skipped"
+            ? "UNCHANGED"
+            : raw.result === "SUCCESS" || raw.result === "ERROR" || raw.result === "UNCHANGED"
+              ? raw.result
+              : undefined;
+    const where: Prisma.DdnsUpdateLogWhereInput = {
       ...(typeof raw.recordId === "string" ? { recordId: raw.recordId } : {}),
-      ...(raw.result === "SUCCESS" || raw.result === "ERROR" || raw.result === "UNCHANGED" ? { result: raw.result } : {}),
+      ...(typeof raw.record === "string" && raw.record ? { hostname: { contains: raw.record } } : {}),
+      ...(result ? { result } : {}),
+      ...(action ? { action } : {}),
     };
     const [items, total] = await Promise.all([
       db.ddnsUpdateLog.findMany({

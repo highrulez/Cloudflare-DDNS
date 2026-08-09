@@ -21,7 +21,6 @@ export function createDatabase(url = process.env.DATABASE_URL): PrismaClient {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __ddnsPrisma: PrismaClient | undefined;
 }
 

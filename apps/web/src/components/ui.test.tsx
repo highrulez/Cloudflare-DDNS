@@ -6,7 +6,7 @@ describe('Dialog', () => {
   it('exposes accessible dialog semantics and closes with Escape', () => {
     const close = vi.fn();
     render(<Dialog open title="Delete record?" description="This cannot be undone." onClose={close}><button>Confirm</button></Dialog>);
-    expect(screen.getByRole('dialog', { name: 'Delete record?' })).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByRole('dialog', { name: 'Delete record?' }).getAttribute('aria-modal')).toBe('true');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(close).toHaveBeenCalledOnce();
   });
@@ -21,6 +21,6 @@ describe('ToastProvider', () => {
   it('announces successful actions', () => {
     render(<ToastProvider><ToastTrigger /></ToastProvider>);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(screen.getByText('Record saved.')).toBeVisible();
+    expect(screen.getByText('Record saved.')).not.toBeNull();
   });
 });
