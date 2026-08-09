@@ -18,6 +18,7 @@ import {
   linkExistingRecord
 } from '../records/service.js';
 import { encryptSecret } from '../security/crypto.js';
+import { createSession, requireAuth, setSessionCookie } from '../security/sessions.js';
 
 async function ensureSetupOpen(db: PrismaClient, reply: FastifyReply) {
   const state = await db.setupState.findUnique({ where: { id: 1 } });
@@ -31,6 +32,17 @@ async function ensureSetupOpen(db: PrismaClient, reply: FastifyReply) {
 }
 
 export function registerSetupRoutes(app: FastifyInstance, db: PrismaClient, config: Config) {
+  app.addHook('preHandler', async (request, reply) => {
+    const pathname = request.url.split('?')[0];
+    if (
+      !pathname?.startsWith('/api/setup/') ||
+      pathname === '/api/setup/status' ||
+      pathname === '/api/setup/admin'
+    )
+      return;
+    if ((await db.user.count()) > 0) await requireAuth(request, reply);
+  });
+
   app.get('/api/setup/status', async () => {
     const [state, users] = await Promise.all([
       db.setupState.upsert({ where: { id: 1 }, create: { id: 1 }, update: {} }),
@@ -59,6 +71,8 @@ export function registerSetupRoutes(app: FastifyInstance, db: PrismaClient, conf
         },
         { isolationLevel: 'Serializable' }
       );
+      const session = await createSession(db, config, user.id);
+      setSessionCookie(reply, config, session.token, session.expiresAt);
       return reply.code(201).send({ id: user.id, username: user.username, step: 2 });
     } catch (error) {
       if (error instanceof Error && error.message === 'ADMIN_EXISTS') {
@@ -126,14 +140,12 @@ export function registerSetupRoutes(app: FastifyInstance, db: PrismaClient, conf
       create: { id: 1, step: 3 },
       update: { step: 3 }
     });
-    return reply
-      .code(201)
-      .send({
-        ...account,
-        tokenCiphertext: undefined,
-        tokenIv: undefined,
-        tokenAuthTag: undefined
-      });
+    return reply.code(201).send({
+      ...account,
+      tokenCiphertext: undefined,
+      tokenIv: undefined,
+      tokenAuthTag: undefined
+    });
   });
 
   app.get('/api/setup/ip', async (_request, reply) => {
@@ -233,14 +245,12 @@ export function registerSetupRoutes(app: FastifyInstance, db: PrismaClient, conf
       db.managedDnsRecord.count()
     ]);
     if (!users || !accounts || !records) {
-      return reply
-        .code(400)
-        .send({
-          error: {
-            code: 'SETUP_INCOMPLETE',
-            message: 'Administrator, Cloudflare account, and record are required'
-          }
-        });
+      return reply.code(400).send({
+        error: {
+          code: 'SETUP_INCOMPLETE',
+          message: 'Administrator, Cloudflare account, and record are required'
+        }
+      });
     }
     const state = await db.setupState.update({
       where: { id: 1 },

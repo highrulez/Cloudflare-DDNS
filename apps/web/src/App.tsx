@@ -17,6 +17,9 @@ const RecordsPage = lazy(() =>
 const SetupWizard = lazy(() =>
   import('./pages/setup').then((module) => ({ default: module.SetupWizard }))
 );
+const SystemPage = lazy(() =>
+  import('./pages/system').then((module) => ({ default: module.SystemPage }))
+);
 
 function Protected() {
   const { user, loading } = useAuth();
@@ -55,6 +58,7 @@ export default function App() {
           <Route path="/records" element={<RecordsPage />} />
           <Route path="/cloudflare" element={<CloudflarePage />} />
           <Route path="/history" element={<HistoryPage />} />
+          <Route path="/system" element={<SystemPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

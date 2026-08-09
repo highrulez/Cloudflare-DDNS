@@ -14,6 +14,8 @@ and records every result in MariaDB.
 - Public-IP provider fallback with strict public-address validation
 - Per-record retries and failures; one bad record never stops the remaining run
 - Dashboard health, scheduler state, recent activity, and paginated update history
+- Authenticated System dashboard for Synology, Docker, MariaDB, Cloudflare, DDNS, proxy diagnostics,
+  self-tests, and sanitized in-memory logs
 - Local Argon2 administrator login with MariaDB-backed HttpOnly sessions
 - Responsive React dashboard
 
@@ -53,7 +55,8 @@ and records every result in MariaDB.
    docker compose up -d
    ```
 
-6. Open `http://SYNOLOGY-IP:8090` and complete the setup wizard.
+6. Configure Synology Reverse Proxy for `https://dns.highrulez.com` to
+   `http://127.0.0.1:8090`, then open the HTTPS URL and complete setup.
 
 Compose starts only the application container. It does not install, create, initialize, start,
 stop, or back up MariaDB.
@@ -64,15 +67,19 @@ Important values:
 
 - `APP_HOST`: Fastify bind address, fixed to `0.0.0.0` by Compose
 - `APP_PORT`: Fastify host-network port, fixed to `8090` by Compose
-- `APP_ORIGIN`: exact browser origin, such as `http://192.168.1.10:8090`
+- `APP_ORIGIN`: exact public browser origin, `https://dns.highrulez.com`
 - `DATABASE_URL`: complete URL for the existing Synology MariaDB database, such as
   `mysql://cloudflare_ddns:encoded-password@192.168.1.10:3307/cloudflare_ddns`
 - `ENCRYPTION_KEY`: canonical base64 for exactly 32 random bytes; encrypts API tokens
 - `SESSION_SECRET`: at least 32 random characters; protects opaque session-token hashes
-- `COOKIE_SECURE`: set `true` when the dashboard is served over HTTPS
+- `COOKIE_SECURE`: keep `true` when the dashboard is served over HTTPS
 - `TZ`: defaults to `Asia/Kuala_Lumpur`
 
 Never commit `.env`. Losing `ENCRYPTION_KEY` makes stored Cloudflare tokens unrecoverable.
+
+Fastify trusts Synology's forwarded protocol, host, port, and client-address headers. Origin
+validation and absolute public-origin reporting always use `APP_ORIGIN`; the application does not
+derive public URLs from the internal `127.0.0.1:8090` listener.
 
 ## Cloudflare API token
 
@@ -130,8 +137,14 @@ errors are not retried.
 curl -fsS http://SYNOLOGY-IP:8090/api/health
 ```
 
-The endpoint reports application, database, scheduler, latest check, and current public-IP state
-without secrets. Docker uses the same endpoint.
+The public endpoint reports only liveness/readiness status and a timestamp. Docker uses the same
+minimal endpoint. Detailed database, scheduler, network, and provider information is available only
+on the authenticated System page.
+
+The authenticated **System** page auto-refreshes every 30 seconds. It provides infrastructure
+status, on-demand self-tests, and a sanitized diagnostics report. Recent logs are held only in
+container memory and are cleared on restart. API tokens, passwords, cookies, encryption material,
+session secrets, and the database URL are excluded from log and diagnostics responses.
 
 ## Backups
 

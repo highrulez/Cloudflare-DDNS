@@ -15,7 +15,9 @@ import { registerCloudflareRoutes } from './routes/cloudflare.js';
 import { registerOperationRoutes } from './routes/operations.js';
 import { registerRecordRoutes } from './routes/records.js';
 import { registerSetupRoutes } from './routes/setup.js';
+import { registerSystemRoutes } from './routes/system.js';
 import { registerSecurity } from './security/sessions.js';
+import { createSystemLogger } from './system/logs.js';
 
 export async function buildApp(
   db: PrismaClient,
@@ -23,8 +25,12 @@ export async function buildApp(
   options: { startScheduler?: boolean } = {}
 ) {
   const app = Fastify({
-    logger: config.NODE_ENV !== 'test',
-    trustProxy: true,
+    ...(config.NODE_ENV === 'test'
+      ? { logger: false }
+      : { loggerInstance: createSystemLogger(process.env.LOG_LEVEL ?? 'info') }),
+    // Synology Reverse Proxy forwards to 127.0.0.1:8090 in host-network mode.
+    // Trust only loopback so direct LAN clients cannot spoof forwarded IP/protocol headers.
+    trustProxy: ['127.0.0.1', '::1'],
     bodyLimit: 64 * 1024,
     requestTimeout: 30_000
   });
@@ -39,6 +45,7 @@ export async function buildApp(
   registerCloudflareRoutes(app, db, config);
   registerRecordRoutes(app, db, config, engine, scheduler);
   registerOperationRoutes(app, db, config, engine, scheduler);
+  registerSystemRoutes(app, db, config, scheduler);
 
   const webRoot = resolve(process.env.WEB_ROOT ?? 'public');
   if (existsSync(webRoot)) {

@@ -17,21 +17,12 @@ export function registerOperationRoutes(
   app.get('/api/health', async (_request, reply) => {
     try {
       await db.$queryRaw`SELECT 1`;
-      const [schedulerState, latestIp] = await Promise.all([
-        db.schedulerState.findUnique({ where: { id: 1 } }),
-        db.ipDetectionRun.findFirst({ orderBy: { startedAt: 'desc' } })
-      ]);
       return {
         status: 'ok',
-        database: 'ok',
-        scheduler: schedulerState,
-        latestIp,
         timestamp: new Date().toISOString()
       };
     } catch {
-      return reply
-        .code(503)
-        .send({ status: 'error', database: 'error', timestamp: new Date().toISOString() });
+      return reply.code(503).send({ status: 'error', timestamp: new Date().toISOString() });
     }
   });
 
@@ -147,14 +138,12 @@ export function registerOperationRoutes(
   app.post('/api/ddns/update', { preHandler: requireAuth }, execute('MANUAL_UPDATE'));
   app.post('/api/ddns/force', { preHandler: requireAuth }, async (request, reply) => {
     if ((request.body as { confirm?: unknown })?.confirm !== true) {
-      return reply
-        .code(400)
-        .send({
-          error: {
-            code: 'CONFIRMATION_REQUIRED',
-            message: 'Force update requires explicit confirmation'
-          }
-        });
+      return reply.code(400).send({
+        error: {
+          code: 'CONFIRMATION_REQUIRED',
+          message: 'Force update requires explicit confirmation'
+        }
+      });
     }
     return execute('FORCE', true)(request, reply);
   });

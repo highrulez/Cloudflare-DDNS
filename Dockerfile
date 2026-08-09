@@ -25,9 +25,15 @@ RUN DATABASE_URL="mysql://build:build@127.0.0.1:3306/build" pnpm db:generate \
 
 FROM node:24-bookworm-slim AS runtime
 
+ARG APP_VERSION=1.0.0
+ARG GIT_COMMIT=unknown
+ARG BUILD_DATE=unknown
 ENV NODE_ENV=production
 ENV HOME=/home/node
 ENV TMPDIR=/tmp
+ENV APP_VERSION=$APP_VERSION
+ENV GIT_COMMIT=$GIT_COMMIT
+ENV BUILD_DATE=$BUILD_DATE
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
@@ -45,7 +51,7 @@ COPY --from=build /output/database/node_modules ./database/node_modules
 COPY --chmod=755 docker/start.sh /usr/local/bin/start-cloudflare-ddns
 
 RUN test -f /app/dist/schema-check.js \
-    && node -e "['fastify','@fastify/cookie','@fastify/helmet','@fastify/static','argon2','mariadb','@prisma/adapter-mariadb','@prisma/client','zod','dotenv'].forEach(require.resolve); console.log('Runtime dependencies OK')"
+    && node -e "['fastify','@fastify/cookie','@fastify/helmet','@fastify/static','argon2','mariadb','@prisma/adapter-mariadb','@prisma/client','zod','dotenv','pino'].forEach(require.resolve); console.log('Runtime dependencies OK')"
 
 USER node
 EXPOSE 8090

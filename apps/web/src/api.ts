@@ -113,6 +113,107 @@ export type Settings = {
   timezone: string;
 };
 export type Page<T> = { items: T[]; page: number; pageSize: number; total: number };
+export type HealthState = 'healthy' | 'warning' | 'error';
+export type SystemOverview = {
+  generatedAt: string;
+  network: {
+    ipv4: string | null;
+    ipv6: string | null;
+    ipv4Status: DetectionStatus | null;
+    ipv6Status: DetectionStatus | null;
+    ipv4Provider: string | null;
+    ipv6Provider: string | null;
+    ipv4LatencyMs: number | null;
+    ipv6LatencyMs: number | null;
+    detectedAt: string | null;
+  };
+  synology: {
+    hostname: string;
+    operatingSystem: string;
+    kernel: string;
+    architecture: string;
+    timezone: string;
+  };
+  docker: {
+    containerId: string;
+    containerName: string;
+    networkMode: string;
+    hostNetworking: boolean;
+    uptimeSeconds: number;
+    nodeVersion: string;
+    platform: string;
+  };
+  database: {
+    status: HealthState;
+    type: string;
+    version: string;
+    database: string;
+    latencyMs: number;
+    currentMigration: string | null;
+    pendingMigrations: string[];
+  };
+  cloudflare: {
+    status: HealthState;
+    accounts: number;
+    zones: number;
+    latencyMs: number;
+    lastSuccessfulRequest: string | null;
+    permissions: {
+      zoneRead: 'granted' | 'denied' | 'not_verified';
+      dnsEdit: 'granted' | 'denied' | 'not_verified';
+    };
+    message: string;
+  };
+  ddns: {
+    scheduler: string;
+    intervalMinutes: number;
+    lastRunAt: string | null;
+    nextRunAt: string | null;
+    lastSuccessfulUpdate: string | null;
+    leaseOwner: string;
+    schedulerVersion: string;
+  };
+  reverseProxy: {
+    reverseProxyDetected: boolean;
+    https: boolean;
+    protocol: string;
+    hostname: string;
+    clientIp: string;
+    forwardedProto: string | null;
+    forwardedHost: string | null;
+    forwardedPort: string | null;
+    forwardedFor: string | null;
+    appOrigin: string | null;
+    cookieSecure: boolean;
+    trustProxy: boolean;
+    warnings: string[];
+  };
+  application: {
+    version: string;
+    commit: string;
+    buildDate: string | null;
+    environment: string;
+    configurationVersion: string;
+    latestRelease: string | null;
+    startedAt: string;
+  };
+};
+export type SystemSelfTest = {
+  id: string;
+  name: string;
+  status: 'success' | 'warning' | 'error';
+  latencyMs: number;
+  message: string;
+  timestamp: string;
+};
+export type SystemLog = {
+  id: string;
+  time: string;
+  level: 'info' | 'warning' | 'error';
+  category: 'application' | 'cloudflare' | 'scheduler' | 'authentication' | 'database';
+  message: string;
+  details?: Record<string, unknown>;
+};
 
 export class ApiError extends Error {
   constructor(
@@ -148,6 +249,15 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   }
   return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
+}
+
+async function requestText(path: string): Promise<string> {
+  const response = await fetch(`/api${path}`, {
+    credentials: 'include',
+    headers: { Accept: 'text/plain' }
+  });
+  if (!response.ok) throw new ApiError(`Request failed (${response.status})`, response.status);
+  return response.text();
 }
 
 const body = (method: string, data?: unknown): RequestInit => ({
@@ -374,7 +484,15 @@ export const api = {
   updateProfile: (data: { username: string }) =>
     request<{ user: User }>('/auth/profile', body('PATCH', data)),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
-    request<void>('/auth/password', body('PUT', data))
+    request<void>('/auth/password', body('PUT', data)),
+  systemOverview: () => request<SystemOverview>('/system/overview'),
+  refreshSystemNetwork: () => request<PublicIp>('/system/network/refresh', body('POST')),
+  runSystemTests: () =>
+    request<{ timestamp: string; tests: SystemSelfTest[] }>('/system/tests', body('POST')),
+  systemLogs: (query?: URLSearchParams) =>
+    request<{ items: SystemLog[] }>(`/system/logs${query ? `?${query}` : ''}`),
+  systemDiagnostics: () => requestText('/system/diagnostics'),
+  systemLogsDownloadUrl: '/api/system/logs/download'
 };
 
 function mapAccount(value: Record<string, unknown>): Account {

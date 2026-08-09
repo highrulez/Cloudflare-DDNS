@@ -42,11 +42,12 @@ describe("authentication smoke flow", () => {
       NODE_ENV: "test",
       APP_HOST: "127.0.0.1",
       APP_PORT: 8090,
+      APP_ORIGIN: "https://dns.highrulez.com",
       DATABASE_URL: "mysql://user:password@localhost:3306/ddns",
       SESSION_SECRET: "a-session-secret-that-is-longer-than-32-characters",
       ENCRYPTION_KEY: Buffer.alloc(32),
       COOKIE_NAME: "cloudflare_ddns_session",
-      COOKIE_SECURE: false,
+      COOKIE_SECURE: true,
       SESSION_TTL_SECONDS: 3600,
       CLOUDFLARE_API_BASE: "https://api.cloudflare.com/client/v4",
       IPV4_PROVIDERS: ["https://api.ipify.org"],
@@ -64,6 +65,7 @@ describe("authentication smoke flow", () => {
     const setCookie = login.headers["set-cookie"];
     const cookie = (Array.isArray(setCookie) ? setCookie[0] : setCookie)?.split(";")[0];
     expect(cookie).toContain("cloudflare_ddns_session=");
+    expect(Array.isArray(setCookie) ? setCookie[0] : setCookie).toContain("Secure");
 
     const me = await app.inject({ method: "GET", url: "/api/auth/me", headers: { cookie: cookie! } });
     expect(me.statusCode).toBe(200);

@@ -10,7 +10,7 @@
    MariaDB user grant applies. Verify before changing it.
 4. In Container Manager, create a Project from the repository directory and select `compose.yaml`.
 5. Build and start the project.
-6. Open `http://NAS-IP:8090`.
+6. Configure the reverse proxy, then open `https://dns.highrulez.com`.
 
 The project creates exactly one container:
 
@@ -21,6 +21,9 @@ It does not deploy or manage a MariaDB container, volume, database, or database 
 The application container uses Docker host networking. It shares the Synology network namespace so
 public IPv4 and IPv6 detection represent the NAS itself. Compose does not publish ports or create a
 separate Docker IPv6 subnet; Fastify listens directly on `0.0.0.0:8090`. Port `8080` is not used.
+Compose also shares the host UTS namespace for the NAS hostname and mounts
+`/etc.defaults/VERSION` read-only so the System page can identify DSM. The Docker socket is not
+mounted.
 
 ## Existing MariaDB prerequisites
 
@@ -64,12 +67,36 @@ The startup process does not create the MariaDB server, database, or user.
 
 ## Reverse proxy and HTTPS
 
-When using Synology Login Portal or another reverse proxy:
+Create a Synology DSM reverse-proxy rule:
 
-- Forward the public host to `http://127.0.0.1:8090`.
-- Set `APP_ORIGIN` to the exact HTTPS URL.
-- Set `COOKIE_SECURE=true`.
-- Preserve `Host`, `X-Forwarded-For`, and `X-Forwarded-Proto`.
+- Source protocol: `HTTPS`
+- Source hostname: `dns.highrulez.com`
+- Source port: `443`
+- Destination protocol: `HTTP`
+- Destination hostname: `127.0.0.1`
+- Destination port: `8090`
+
+Set `APP_ORIGIN=https://dns.highrulez.com` and `COOKIE_SECURE=true`. Ensure Synology forwards:
+
+- `X-Forwarded-Proto: https`
+- `X-Forwarded-Host: dns.highrulez.com`
+- `X-Forwarded-Port: 443`
+- `X-Forwarded-For: $remote_addr`
+
+Fastify trusts forwarded headers only from loopback (`127.0.0.1` or `::1`), matching the destination
+above. Direct LAN clients cannot spoof `request.protocol`, `request.hostname`, or `request.ip`.
+Do not expose port `8090` publicly. After signing in, open **System → Overview** and confirm HTTPS,
+original host, client IP, secure cookies, and trusted-proxy handling are healthy.
+
+To include release metadata in the System page, set these values before rebuilding:
+
+```sh
+export APP_VERSION=1.0.0
+export GIT_COMMIT="$(git rev-parse --short HEAD)"
+export BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+docker compose build --pull
+docker compose up -d
+```
 
 ## Operations
 
@@ -78,6 +105,11 @@ docker compose ps
 docker compose logs -f app
 docker compose restart app
 ```
+
+The authenticated **System** page includes read-only MariaDB migration status, Cloudflare
+connectivity, scheduler state, on-demand infrastructure self-tests, and sanitized recent logs. Logs
+shown there are held in memory and reset when the container restarts. Diagnostics never include API
+tokens, passwords, cookies, session/encryption secrets, or `DATABASE_URL`.
 
 ## Verify host-network IPv4 and IPv6
 

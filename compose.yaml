@@ -5,6 +5,12 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        APP_VERSION: ${APP_VERSION:-1.0.0}
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    container_name: cloudflare-ddns-manager
+    uts: host
     environment:
       NODE_ENV: production
       APP_HOST: 0.0.0.0
@@ -12,11 +18,17 @@ services:
       APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env}
       TZ: ${TZ:-Asia/Kuala_Lumpur}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      APP_VERSION: ${APP_VERSION:-1.0.0}
+      GIT_COMMIT: ${GIT_COMMIT:-unknown}
+      BUILD_DATE: ${BUILD_DATE:-unknown}
+      CONFIG_VERSION: ${CONFIG_VERSION:-1}
+      CONTAINER_NAME: cloudflare-ddns-manager
+      DOCKER_NETWORK_MODE: host
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
       COOKIE_NAME: ${COOKIE_NAME:-cloudflare_ddns_session}
-      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-43200}
       CLOUDFLARE_API_BASE: ${CLOUDFLARE_API_BASE:-https://api.cloudflare.com/client/v4}
       IPV4_PROVIDERS: ${IPV4_PROVIDERS:-https://api4.ipify.org,https://checkip.amazonaws.com,https://ipv4.icanhazip.com}
@@ -25,6 +37,8 @@ services:
       DATABASE_QUERY_TIMEOUT_MS: ${DATABASE_QUERY_TIMEOUT_MS:-10000}
       HTTP_TIMEOUT_MS: ${HTTP_TIMEOUT_MS:-10000}
     network_mode: host
+    volumes:
+      - /etc.defaults/VERSION:/host/etc.defaults/VERSION:ro
     restart: unless-stopped
     init: true
     read_only: true
