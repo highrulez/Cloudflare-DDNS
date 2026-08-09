@@ -73,18 +73,20 @@ export function DashboardPage() {
         <IpCard family="IPv4" value={data.currentIp} status={data.ipv4Status} />
         <IpCard family="IPv6" value={data.currentIpv6} status={data.ipv6Status} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <Metric label="Managed Records" value={data.totalRecords} note="All selected records" />
         <Metric
-          label="DDNS enabled"
-          value={data.enabledRecords}
-          note={`${data.totalRecords} managed records`}
+          label="Proxied Records"
+          value={data.proxiedRecords}
+          note="Cloudflare proxy enabled"
         />
         <Metric
-          label="Synchronized"
-          value={Math.max(0, data.enabledRecords - data.failedRecords)}
-          note="Matching public IP"
+          label="DNS Only Records"
+          value={data.dnsOnlyRecords}
+          note="Origin IP is published"
         />
-        <Metric label="Needs attention" value={data.failedRecords} note="Drifted or failed" />
+        <Metric label="A Records" value={data.aRecords} note="Managed IPv4 records" />
+        <Metric label="AAAA Records" value={data.aaaaRecords} note="Managed IPv6 records" />
         <Card className="p-5">
           <span className="text-sm text-slate-500">Overall status</span>
           <div className="mt-3">

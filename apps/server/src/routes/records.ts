@@ -64,6 +64,59 @@ export function registerRecordRoutes(
     return { items, page, pageSize, total, totalPages: Math.ceil(total / pageSize) };
   });
 
+  app.post('/api/records/refresh', { preHandler: requireAuth }, async () => {
+    const records = await db.managedDnsRecord.findMany({
+      where: { cloudflareRecordId: { not: null } },
+      select: {
+        id: true,
+        accountId: true,
+        zoneId: true,
+        cloudflareRecordId: true
+      }
+    });
+    const groups = new Map<string, typeof records>();
+    for (const record of records) {
+      const key = `${record.accountId}:${record.zoneId}`;
+      groups.set(key, [...(groups.get(key) ?? []), record]);
+    }
+    let refreshed = 0;
+    let failedZones = 0;
+    await Promise.all(
+      [...groups.values()].map(async (zoneRecords) => {
+        const first = zoneRecords[0];
+        if (!first) return;
+        try {
+          const context = await cloudflareContext(db, config, first.accountId, first.zoneId);
+          const remoteRecords = await context.client.listRecords(context.zone.cloudflareId);
+          const remoteById = new Map(remoteRecords.map((record) => [record.id, record]));
+          const updates = zoneRecords.flatMap((record) => {
+            const remote = record.cloudflareRecordId
+              ? remoteById.get(record.cloudflareRecordId)
+              : undefined;
+            if (!remote) return [];
+            refreshed += 1;
+            return [
+              db.managedDnsRecord.update({
+                where: { id: record.id },
+                data: {
+                  hostname: remote.name,
+                  normalizedHostname: remote.name.toLowerCase(),
+                  content: remote.content,
+                  proxied: remote.proxied,
+                  ttl: remote.ttl
+                }
+              })
+            ];
+          });
+          if (updates.length) await db.$transaction(updates);
+        } catch {
+          failedZones += 1;
+        }
+      })
+    );
+    return { refreshed, failedZones };
+  });
+
   app.post('/api/records', { preHandler: requireAuth }, async (request, reply) => {
     const input = createDnsRecordSchema.parse(request.body);
     return reply.code(201).send(await createManagedRecord(db, config, input));

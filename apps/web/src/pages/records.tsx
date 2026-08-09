@@ -35,6 +35,8 @@ export function RecordsPage() {
   const [typeFilter, setTypeFilter] = useState('');
   const [ddnsFilter, setDdnsFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [proxyFilter, setProxyFilter] = useState('');
+  const [proxySort, setProxySort] = useState('');
   const [search, setSearch] = useState('');
 
   const load = async () => {
@@ -43,7 +45,10 @@ export function RecordsPage() {
     try {
       const query = new URLSearchParams({ pageSize: '100' });
       const [recordResult, accountResult, detected] = await Promise.all([
-        api.records(query),
+        api
+          .refreshRecordMetadata()
+          .catch(() => undefined)
+          .then(() => api.records(query)),
         api.accounts(),
         api.detectIp().catch(() => ({ ipv4: null, ipv6: null }))
       ]);
@@ -65,19 +70,35 @@ export function RecordsPage() {
     : accounts.flatMap((account) => account.zoneItems);
   const visible = useMemo(
     () =>
-      records.filter(
-        (record) =>
-          (!accountFilter || record.accountId === accountFilter) &&
-          (!zoneFilter || record.zoneId === zoneFilter) &&
-          (!typeFilter || record.type === typeFilter) &&
-          (!ddnsFilter || (ddnsFilter === 'on' ? record.enabled : !record.enabled)) &&
-          (!statusFilter || record.status === statusFilter) &&
-          (!search ||
-            `${record.name} ${record.zoneName} ${record.content}`
-              .toLowerCase()
-              .includes(search.toLowerCase()))
-      ),
-    [records, accountFilter, zoneFilter, typeFilter, ddnsFilter, statusFilter, search]
+      records
+        .filter(
+          (record) =>
+            (!accountFilter || record.accountId === accountFilter) &&
+            (!zoneFilter || record.zoneId === zoneFilter) &&
+            (!typeFilter || record.type === typeFilter) &&
+            (!ddnsFilter || (ddnsFilter === 'on' ? record.enabled : !record.enabled)) &&
+            (!statusFilter || record.status === statusFilter) &&
+            (!proxyFilter || (proxyFilter === 'proxied' ? record.proxied : !record.proxied)) &&
+            (!search ||
+              `${record.name} ${record.zoneName} ${record.content}`
+                .toLowerCase()
+                .includes(search.toLowerCase()))
+        )
+        .sort((left, right) => {
+          if (!proxySort || left.proxied === right.proxied) return 0;
+          return proxySort === 'proxied-first' ? (left.proxied ? -1 : 1) : left.proxied ? 1 : -1;
+        }),
+    [
+      records,
+      accountFilter,
+      zoneFilter,
+      typeFilter,
+      ddnsFilter,
+      statusFilter,
+      proxyFilter,
+      proxySort,
+      search
+    ]
   );
 
   const run = async (record: RecordItem, action: 'check' | 'force' | 'toggle') => {
@@ -99,6 +120,24 @@ export function RecordsPage() {
       if (action !== 'toggle') await load();
     } catch (caught) {
       toast(caught instanceof Error ? caught.message : 'Record action failed', 'error');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  const toggleProxy = async (record: RecordItem) => {
+    const proxied = !record.proxied;
+    setBusy(`${record.id}-proxy`);
+    setRecords((items) =>
+      items.map((item) => (item.id === record.id ? { ...item, proxied } : item))
+    );
+    try {
+      const result = await api.updateRecord(record.id, { proxied });
+      setRecords((items) => items.map((item) => (item.id === record.id ? result.record : item)));
+      toast(`Proxy mode changed to ${proxied ? 'Proxied' : 'DNS Only'}.`);
+    } catch (caught) {
+      setRecords((items) => items.map((item) => (item.id === record.id ? record : item)));
+      toast(caught instanceof Error ? caught.message : 'Could not change proxy mode', 'error');
     } finally {
       setBusy('');
     }
@@ -179,7 +218,7 @@ export function RecordsPage() {
           </>
         }
       />
-      <Card className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-6">
+      <Card className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <Field
           label="Search"
           value={search}
@@ -242,6 +281,24 @@ export function RecordsPage() {
           <option value="error">Failed</option>
           <option value="disabled">Disabled</option>
         </SelectField>
+        <SelectField
+          label="Proxy"
+          value={proxyFilter}
+          onChange={(event) => setProxyFilter(event.target.value)}
+        >
+          <option value="">All</option>
+          <option value="proxied">Proxied</option>
+          <option value="dns-only">DNS Only</option>
+        </SelectField>
+        <SelectField
+          label="Sort"
+          value={proxySort}
+          onChange={(event) => setProxySort(event.target.value)}
+        >
+          <option value="">Default order</option>
+          <option value="proxied-first">Proxy Status: Proxied first</option>
+          <option value="dns-only-first">Proxy Status: DNS Only first</option>
+        </SelectField>
       </Card>
       {loading ? (
         <Loading label="Loading managed DNS records" />
@@ -260,14 +317,22 @@ export function RecordsPage() {
         />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-          <table className="w-full text-left text-sm">
+          <table className="min-w-[1280px] w-full text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-950">
               <tr>
                 <th className="p-4">Domain</th>
                 <th className="p-4">Hostname</th>
                 <th className="p-4">Type</th>
                 <th className="p-4">Cloudflare IP</th>
+                <th className="p-4">TTL</th>
+                <th
+                  className="p-4"
+                  title="Proxied routes HTTP traffic through Cloudflare. DNS Only publishes the origin IP directly."
+                >
+                  Proxy
+                </th>
                 <th className="p-4">Status</th>
+                <th className="p-4">Last Updated</th>
                 <th className="p-4">DDNS</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
@@ -282,8 +347,45 @@ export function RecordsPage() {
                   <td className="p-4 font-medium">{record.name}</td>
                   <td className="p-4 font-mono">{record.type}</td>
                   <td className="p-4 font-mono text-xs">{record.content}</td>
+                  <td className="p-4 font-mono text-xs">
+                    {record.ttl === 1 ? 'Auto' : record.ttl}
+                  </td>
+                  <td className="p-4">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={record.proxied}
+                      aria-label={`Set ${record.name} to ${record.proxied ? 'DNS Only' : 'Proxied'}`}
+                      title={
+                        record.proxied
+                          ? 'Proxied: HTTP traffic is routed through Cloudflare. Click for DNS Only.'
+                          : 'DNS Only: the origin IP is returned directly. Click to enable Cloudflare proxying.'
+                      }
+                      disabled={busy === `${record.id}-proxy`}
+                      onClick={() => void toggleProxy(record)}
+                      className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold transition disabled:cursor-wait disabled:opacity-60 ${
+                        record.proxied
+                          ? 'bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-950 dark:text-orange-300'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${
+                          record.proxied ? 'bg-orange-500' : 'border border-slate-400 bg-white'
+                        }`}
+                      />
+                      {busy === `${record.id}-proxy`
+                        ? 'Updating…'
+                        : record.proxied
+                          ? 'Proxied'
+                          : 'DNS Only'}
+                    </button>
+                  </td>
                   <td className="p-4">
                     <Badge status={record.status} />
+                  </td>
+                  <td className="p-4 whitespace-nowrap text-xs text-slate-500">
+                    {formatDate(record.lastUpdatedAt)}
                   </td>
                   <td className="p-4">
                     <button

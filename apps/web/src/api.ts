@@ -13,6 +13,10 @@ export type Dashboard = {
   nextCheckAt?: string;
   enabledRecords: number;
   totalRecords: number;
+  proxiedRecords: number;
+  dnsOnlyRecords: number;
+  aRecords: number;
+  aaaaRecords: number;
   failedRecords: number;
   recentUpdates: HistoryItem[];
 };
@@ -362,7 +366,14 @@ export const api = {
         detectedAt?: string;
       };
       scheduler?: { running?: boolean; nextCheckAt?: string };
-      records: { total: number; byHealth: Record<string, number> };
+      records: {
+        total: number;
+        byHealth: Record<string, number>;
+        proxied: number;
+        dnsOnly: number;
+        aRecords: number;
+        aaaaRecords: number;
+      };
       recentActivity: Array<Record<string, unknown>>;
     }>('/dashboard');
     const failedRecords =
@@ -377,6 +388,10 @@ export const api = {
       nextCheckAt: result.scheduler?.nextCheckAt,
       enabledRecords: result.records.total - (result.records.byHealth.DISABLED ?? 0),
       totalRecords: result.records.total,
+      proxiedRecords: result.records.proxied,
+      dnsOnlyRecords: result.records.dnsOnly,
+      aRecords: result.records.aRecords,
+      aaaaRecords: result.records.aaaaRecords,
       failedRecords,
       recentUpdates: result.recentActivity.map(mapHistory)
     };
@@ -411,6 +426,8 @@ export const api = {
     );
     return { records: result.items.map(mapRecord) };
   },
+  refreshRecordMetadata: () =>
+    request<{ refreshed: number; failedZones: number }>('/records/refresh', body('POST')),
   createRecord: async (
     data: CreateDnsRecord | Omit<RecordItem, 'id' | 'status' | 'lastCheckedAt' | 'lastUpdatedAt'>
   ) => {

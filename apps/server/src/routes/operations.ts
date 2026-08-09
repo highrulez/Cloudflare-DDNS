@@ -30,7 +30,7 @@ export function registerOperationRoutes(
     const [latestIp, schedulerState, recordGroups, lastRun, recentActivity] = await Promise.all([
       db.ipDetectionRun.findFirst({ orderBy: { startedAt: 'desc' } }),
       db.schedulerState.findUnique({ where: { id: 1 } }),
-      db.managedDnsRecord.groupBy({ by: ['health'], _count: true }),
+      db.managedDnsRecord.groupBy({ by: ['health', 'proxied', 'type'], _count: true }),
       db.ddnsRun.findFirst({ orderBy: { startedAt: 'desc' } }),
       db.ddnsUpdateLog.findMany({ orderBy: { createdAt: 'desc' }, take: 10 })
     ]);
@@ -45,7 +45,26 @@ export function registerOperationRoutes(
       scheduler: schedulerState,
       records: {
         total: recordGroups.reduce((total, group) => total + group._count, 0),
-        byHealth: Object.fromEntries(recordGroups.map((group) => [group.health, group._count]))
+        byHealth: Object.fromEntries(
+          recordGroups.map((group) => [
+            group.health,
+            recordGroups
+              .filter((candidate) => candidate.health === group.health)
+              .reduce((total, candidate) => total + candidate._count, 0)
+          ])
+        ),
+        proxied: recordGroups
+          .filter((group) => group.proxied)
+          .reduce((total, group) => total + group._count, 0),
+        dnsOnly: recordGroups
+          .filter((group) => !group.proxied)
+          .reduce((total, group) => total + group._count, 0),
+        aRecords: recordGroups
+          .filter((group) => group.type === 'A')
+          .reduce((total, group) => total + group._count, 0),
+        aaaaRecords: recordGroups
+          .filter((group) => group.type === 'AAAA')
+          .reduce((total, group) => total + group._count, 0)
       },
       lastRun,
       recentActivity
