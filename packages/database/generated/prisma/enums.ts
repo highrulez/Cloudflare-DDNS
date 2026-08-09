@@ -65,6 +65,8 @@ export const UpdateAction = {
   CREATED: 'CREATED',
   FAILED: 'FAILED',
   DISABLED: 'DISABLED',
+  STOPPED_MANAGING: 'STOPPED_MANAGING',
+  DELETED: 'DELETED',
   NO_IP: 'NO_IP'
 } as const
 

@@ -43,6 +43,8 @@ enum UpdateAction {
   CREATED
   FAILED
   DISABLED
+  STOPPED_MANAGING
+  DELETED
   NO_IP
 }
 enum UpdateResult {
@@ -102,11 +104,14 @@ model CloudflareZone {
   cloudflareId String           @db.VarChar(64)
   name        String            @db.VarChar(253)
   status      String            @db.VarChar(32)
+  recordCount Int               @default(0)
+  lastSyncedAt DateTime?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
   account     CloudflareAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
   records     ManagedDnsRecord[]
   @@unique([accountId, cloudflareId])
+  @@unique([id, accountId])
   @@index([name])
 }
 
@@ -130,9 +135,10 @@ model ManagedDnsRecord {
   createdAt           DateTime          @default(now())
   updatedAt           DateTime          @updatedAt
   account             CloudflareAccount @relation(fields: [accountId], references: [id], onDelete: Restrict)
-  zone                CloudflareZone    @relation(fields: [zoneId], references: [id], onDelete: Restrict)
+  zone                CloudflareZone    @relation(fields: [zoneId, accountId], references: [id, accountId], onDelete: Restrict)
   logs                DdnsUpdateLog[]
   @@unique([accountId, zoneId, normalizedHostname, type])
+  @@unique([zoneId, cloudflareRecordId])
   @@index([enabled, type])
 }
 

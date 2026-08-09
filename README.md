@@ -86,15 +86,24 @@ hint.
 
 ## First setup
 
-The wizard creates the administrator, verifies and stores a Cloudflare token, discovers available
-zones, adds the first managed A/AAAA record, and configures the scheduler. Setup endpoints close
+The wizard creates the administrator, verifies and stores a Cloudflare token, discovers every
+accessible zone and its A/AAAA records, detects public IPv4/IPv6, and lets you select exactly which
+records DDNS may control. New records can be created from the same screen. Setup endpoints close
 after completion.
 
 ## Managing records
 
-Use **DNS Records → Add DNS Record**. Select an account and discovered zone, enter the full
-hostname, select A or AAAA, proxy mode, TTL, and automatic-DDNS state. Removing a managed record
-does not remove the Cloudflare record. Cloudflare deletion is never implicit.
+Use **Cloudflare → View Zones → View Records** to discover existing A/AAAA records and select only
+the records that should follow the Synology public IP. Unselected records are never written by the
+scheduler.
+
+Use **DNS Records → Add DNS Record** to create a new Cloudflare record without leaving the
+application. Select an account and zone, enter a subdomain such as `nas` or `@` for the apex, choose
+A or AAAA, detected or custom IP, proxy mode, TTL, and DDNS state. Duplicate records are never
+created blindly; an existing match can instead be linked for management.
+
+**Stop Managing** removes only the local DDNS association and leaves Cloudflare untouched.
+**Delete from Cloudflare** is a separate destructive action that requires typing the full hostname.
 
 - **Check Now** detects the address and compares Cloudflare without forcing an update.
 - **Update Now** updates an individual record only when needed.

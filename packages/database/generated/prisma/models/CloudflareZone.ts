@@ -20,8 +20,18 @@ export type CloudflareZoneModel = runtime.Types.Result.DefaultSelection<Prisma.$
 
 export type AggregateCloudflareZone = {
   _count: CloudflareZoneCountAggregateOutputType | null
+  _avg: CloudflareZoneAvgAggregateOutputType | null
+  _sum: CloudflareZoneSumAggregateOutputType | null
   _min: CloudflareZoneMinAggregateOutputType | null
   _max: CloudflareZoneMaxAggregateOutputType | null
+}
+
+export type CloudflareZoneAvgAggregateOutputType = {
+  recordCount: number | null
+}
+
+export type CloudflareZoneSumAggregateOutputType = {
+  recordCount: number | null
 }
 
 export type CloudflareZoneMinAggregateOutputType = {
@@ -30,6 +40,8 @@ export type CloudflareZoneMinAggregateOutputType = {
   cloudflareId: string | null
   name: string | null
   status: string | null
+  recordCount: number | null
+  lastSyncedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -40,6 +52,8 @@ export type CloudflareZoneMaxAggregateOutputType = {
   cloudflareId: string | null
   name: string | null
   status: string | null
+  recordCount: number | null
+  lastSyncedAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -50,11 +64,21 @@ export type CloudflareZoneCountAggregateOutputType = {
   cloudflareId: number
   name: number
   status: number
+  recordCount: number
+  lastSyncedAt: number
   createdAt: number
   updatedAt: number
   _all: number
 }
 
+
+export type CloudflareZoneAvgAggregateInputType = {
+  recordCount?: true
+}
+
+export type CloudflareZoneSumAggregateInputType = {
+  recordCount?: true
+}
 
 export type CloudflareZoneMinAggregateInputType = {
   id?: true
@@ -62,6 +86,8 @@ export type CloudflareZoneMinAggregateInputType = {
   cloudflareId?: true
   name?: true
   status?: true
+  recordCount?: true
+  lastSyncedAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -72,6 +98,8 @@ export type CloudflareZoneMaxAggregateInputType = {
   cloudflareId?: true
   name?: true
   status?: true
+  recordCount?: true
+  lastSyncedAt?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -82,6 +110,8 @@ export type CloudflareZoneCountAggregateInputType = {
   cloudflareId?: true
   name?: true
   status?: true
+  recordCount?: true
+  lastSyncedAt?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -125,6 +155,18 @@ export type CloudflareZoneAggregateArgs<ExtArgs extends runtime.Types.Extensions
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: CloudflareZoneAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   *
+   * Select which fields to sum
+  **/
+  _sum?: CloudflareZoneSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   *
    * Select which fields to find the minimum value
   **/
   _min?: CloudflareZoneMinAggregateInputType
@@ -155,6 +197,8 @@ export type CloudflareZoneGroupByArgs<ExtArgs extends runtime.Types.Extensions.I
   take?: number
   skip?: number
   _count?: CloudflareZoneCountAggregateInputType | true
+  _avg?: CloudflareZoneAvgAggregateInputType
+  _sum?: CloudflareZoneSumAggregateInputType
   _min?: CloudflareZoneMinAggregateInputType
   _max?: CloudflareZoneMaxAggregateInputType
 }
@@ -165,9 +209,13 @@ export type CloudflareZoneGroupByOutputType = {
   cloudflareId: string
   name: string
   status: string
+  recordCount: number
+  lastSyncedAt: Date | null
   createdAt: Date
   updatedAt: Date
   _count: CloudflareZoneCountAggregateOutputType | null
+  _avg: CloudflareZoneAvgAggregateOutputType | null
+  _sum: CloudflareZoneSumAggregateOutputType | null
   _min: CloudflareZoneMinAggregateOutputType | null
   _max: CloudflareZoneMaxAggregateOutputType | null
 }
@@ -196,6 +244,8 @@ export type CloudflareZoneWhereInput = {
   cloudflareId?: Prisma.StringFilter<"CloudflareZone"> | string
   name?: Prisma.StringFilter<"CloudflareZone"> | string
   status?: Prisma.StringFilter<"CloudflareZone"> | string
+  recordCount?: Prisma.IntFilter<"CloudflareZone"> | number
+  lastSyncedAt?: Prisma.DateTimeNullableFilter<"CloudflareZone"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"CloudflareZone"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"CloudflareZone"> | Date | string
   account?: Prisma.XOR<Prisma.CloudflareAccountScalarRelationFilter, Prisma.CloudflareAccountWhereInput>
@@ -208,6 +258,8 @@ export type CloudflareZoneOrderByWithRelationInput = {
   cloudflareId?: Prisma.SortOrder
   name?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  recordCount?: Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   account?: Prisma.CloudflareAccountOrderByWithRelationInput
@@ -218,6 +270,7 @@ export type CloudflareZoneOrderByWithRelationInput = {
 export type CloudflareZoneWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   accountId_cloudflareId?: Prisma.CloudflareZoneAccountIdCloudflareIdCompoundUniqueInput
+  id_accountId?: Prisma.CloudflareZoneIdAccountIdCompoundUniqueInput
   AND?: Prisma.CloudflareZoneWhereInput | Prisma.CloudflareZoneWhereInput[]
   OR?: Prisma.CloudflareZoneWhereInput[]
   NOT?: Prisma.CloudflareZoneWhereInput | Prisma.CloudflareZoneWhereInput[]
@@ -225,11 +278,13 @@ export type CloudflareZoneWhereUniqueInput = Prisma.AtLeast<{
   cloudflareId?: Prisma.StringFilter<"CloudflareZone"> | string
   name?: Prisma.StringFilter<"CloudflareZone"> | string
   status?: Prisma.StringFilter<"CloudflareZone"> | string
+  recordCount?: Prisma.IntFilter<"CloudflareZone"> | number
+  lastSyncedAt?: Prisma.DateTimeNullableFilter<"CloudflareZone"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"CloudflareZone"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"CloudflareZone"> | Date | string
   account?: Prisma.XOR<Prisma.CloudflareAccountScalarRelationFilter, Prisma.CloudflareAccountWhereInput>
   records?: Prisma.ManagedDnsRecordListRelationFilter
-}, "id" | "accountId_cloudflareId">
+}, "id" | "accountId_cloudflareId" | "id_accountId">
 
 export type CloudflareZoneOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -237,11 +292,15 @@ export type CloudflareZoneOrderByWithAggregationInput = {
   cloudflareId?: Prisma.SortOrder
   name?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  recordCount?: Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.CloudflareZoneCountOrderByAggregateInput
+  _avg?: Prisma.CloudflareZoneAvgOrderByAggregateInput
   _max?: Prisma.CloudflareZoneMaxOrderByAggregateInput
   _min?: Prisma.CloudflareZoneMinOrderByAggregateInput
+  _sum?: Prisma.CloudflareZoneSumOrderByAggregateInput
 }
 
 export type CloudflareZoneScalarWhereWithAggregatesInput = {
@@ -253,6 +312,8 @@ export type CloudflareZoneScalarWhereWithAggregatesInput = {
   cloudflareId?: Prisma.StringWithAggregatesFilter<"CloudflareZone"> | string
   name?: Prisma.StringWithAggregatesFilter<"CloudflareZone"> | string
   status?: Prisma.StringWithAggregatesFilter<"CloudflareZone"> | string
+  recordCount?: Prisma.IntWithAggregatesFilter<"CloudflareZone"> | number
+  lastSyncedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"CloudflareZone"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"CloudflareZone"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"CloudflareZone"> | Date | string
 }
@@ -262,6 +323,8 @@ export type CloudflareZoneCreateInput = {
   cloudflareId: string
   name: string
   status: string
+  recordCount?: number
+  lastSyncedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   account: Prisma.CloudflareAccountCreateNestedOneWithoutZonesInput
@@ -274,6 +337,8 @@ export type CloudflareZoneUncheckedCreateInput = {
   cloudflareId: string
   name: string
   status: string
+  recordCount?: number
+  lastSyncedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   records?: Prisma.ManagedDnsRecordUncheckedCreateNestedManyWithoutZoneInput
@@ -284,6 +349,8 @@ export type CloudflareZoneUpdateInput = {
   cloudflareId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
+  recordCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   account?: Prisma.CloudflareAccountUpdateOneRequiredWithoutZonesNestedInput
@@ -296,6 +363,8 @@ export type CloudflareZoneUncheckedUpdateInput = {
   cloudflareId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
+  recordCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   records?: Prisma.ManagedDnsRecordUncheckedUpdateManyWithoutZoneNestedInput
@@ -307,6 +376,8 @@ export type CloudflareZoneCreateManyInput = {
   cloudflareId: string
   name: string
   status: string
+  recordCount?: number
+  lastSyncedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -316,6 +387,8 @@ export type CloudflareZoneUpdateManyMutationInput = {
   cloudflareId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
+  recordCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -326,6 +399,8 @@ export type CloudflareZoneUncheckedUpdateManyInput = {
   cloudflareId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
+  recordCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -351,14 +426,25 @@ export type CloudflareZoneAccountIdCloudflareIdCompoundUniqueInput = {
   cloudflareId: string
 }
 
+export type CloudflareZoneIdAccountIdCompoundUniqueInput = {
+  id: string
+  accountId: string
+}
+
 export type CloudflareZoneCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   accountId?: Prisma.SortOrder
   cloudflareId?: Prisma.SortOrder
   name?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  recordCount?: Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type CloudflareZoneAvgOrderByAggregateInput = {
+  recordCount?: Prisma.SortOrder
 }
 
 export type CloudflareZoneMaxOrderByAggregateInput = {
@@ -367,6 +453,8 @@ export type CloudflareZoneMaxOrderByAggregateInput = {
   cloudflareId?: Prisma.SortOrder
   name?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  recordCount?: Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -377,8 +465,14 @@ export type CloudflareZoneMinOrderByAggregateInput = {
   cloudflareId?: Prisma.SortOrder
   name?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  recordCount?: Prisma.SortOrder
+  lastSyncedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type CloudflareZoneSumOrderByAggregateInput = {
+  recordCount?: Prisma.SortOrder
 }
 
 export type CloudflareZoneScalarRelationFilter = {
@@ -447,6 +541,8 @@ export type CloudflareZoneCreateWithoutAccountInput = {
   cloudflareId: string
   name: string
   status: string
+  recordCount?: number
+  lastSyncedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   records?: Prisma.ManagedDnsRecordCreateNestedManyWithoutZoneInput
@@ -457,6 +553,8 @@ export type CloudflareZoneUncheckedCreateWithoutAccountInput = {
   cloudflareId: string
   name: string
   status: string
+  recordCount?: number
+  lastSyncedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   records?: Prisma.ManagedDnsRecordUncheckedCreateNestedManyWithoutZoneInput
@@ -497,6 +595,8 @@ export type CloudflareZoneScalarWhereInput = {
   cloudflareId?: Prisma.StringFilter<"CloudflareZone"> | string
   name?: Prisma.StringFilter<"CloudflareZone"> | string
   status?: Prisma.StringFilter<"CloudflareZone"> | string
+  recordCount?: Prisma.IntFilter<"CloudflareZone"> | number
+  lastSyncedAt?: Prisma.DateTimeNullableFilter<"CloudflareZone"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"CloudflareZone"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"CloudflareZone"> | Date | string
 }
@@ -506,6 +606,8 @@ export type CloudflareZoneCreateWithoutRecordsInput = {
   cloudflareId: string
   name: string
   status: string
+  recordCount?: number
+  lastSyncedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   account: Prisma.CloudflareAccountCreateNestedOneWithoutZonesInput
@@ -517,6 +619,8 @@ export type CloudflareZoneUncheckedCreateWithoutRecordsInput = {
   cloudflareId: string
   name: string
   status: string
+  recordCount?: number
+  lastSyncedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -542,6 +646,8 @@ export type CloudflareZoneUpdateWithoutRecordsInput = {
   cloudflareId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
+  recordCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   account?: Prisma.CloudflareAccountUpdateOneRequiredWithoutZonesNestedInput
@@ -553,6 +659,8 @@ export type CloudflareZoneUncheckedUpdateWithoutRecordsInput = {
   cloudflareId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
+  recordCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -562,6 +670,8 @@ export type CloudflareZoneCreateManyAccountInput = {
   cloudflareId: string
   name: string
   status: string
+  recordCount?: number
+  lastSyncedAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -571,6 +681,8 @@ export type CloudflareZoneUpdateWithoutAccountInput = {
   cloudflareId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
+  recordCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   records?: Prisma.ManagedDnsRecordUpdateManyWithoutZoneNestedInput
@@ -581,6 +693,8 @@ export type CloudflareZoneUncheckedUpdateWithoutAccountInput = {
   cloudflareId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
+  recordCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   records?: Prisma.ManagedDnsRecordUncheckedUpdateManyWithoutZoneNestedInput
@@ -591,6 +705,8 @@ export type CloudflareZoneUncheckedUpdateManyWithoutAccountInput = {
   cloudflareId?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.StringFieldUpdateOperationsInput | string
+  recordCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastSyncedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -632,6 +748,8 @@ export type CloudflareZoneSelect<ExtArgs extends runtime.Types.Extensions.Intern
   cloudflareId?: boolean
   name?: boolean
   status?: boolean
+  recordCount?: boolean
+  lastSyncedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   account?: boolean | Prisma.CloudflareAccountDefaultArgs<ExtArgs>
@@ -647,11 +765,13 @@ export type CloudflareZoneSelectScalar = {
   cloudflareId?: boolean
   name?: boolean
   status?: boolean
+  recordCount?: boolean
+  lastSyncedAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type CloudflareZoneOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "accountId" | "cloudflareId" | "name" | "status" | "createdAt" | "updatedAt", ExtArgs["result"]["cloudflareZone"]>
+export type CloudflareZoneOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "accountId" | "cloudflareId" | "name" | "status" | "recordCount" | "lastSyncedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["cloudflareZone"]>
 export type CloudflareZoneInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   account?: boolean | Prisma.CloudflareAccountDefaultArgs<ExtArgs>
   records?: boolean | Prisma.CloudflareZone$recordsArgs<ExtArgs>
@@ -670,6 +790,8 @@ export type $CloudflareZonePayload<ExtArgs extends runtime.Types.Extensions.Inte
     cloudflareId: string
     name: string
     status: string
+    recordCount: number
+    lastSyncedAt: Date | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["cloudflareZone"]>
@@ -1048,6 +1170,8 @@ export interface CloudflareZoneFieldRefs {
   readonly cloudflareId: Prisma.FieldRef<"CloudflareZone", 'String'>
   readonly name: Prisma.FieldRef<"CloudflareZone", 'String'>
   readonly status: Prisma.FieldRef<"CloudflareZone", 'String'>
+  readonly recordCount: Prisma.FieldRef<"CloudflareZone", 'Int'>
+  readonly lastSyncedAt: Prisma.FieldRef<"CloudflareZone", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"CloudflareZone", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"CloudflareZone", 'DateTime'>
 }

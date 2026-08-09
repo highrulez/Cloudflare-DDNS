@@ -1,27 +1,32 @@
-import { existsSync } from "node:fs";
-import { resolve } from "node:path";
-import type { PrismaClient } from "@ddns/database";
-import cookie from "@fastify/cookie";
-import helmet from "@fastify/helmet";
-import staticFiles from "@fastify/static";
-import Fastify from "fastify";
-import { ZodError } from "zod";
-import type { Config } from "./config.js";
-import { DdnsEngine } from "./ddns/engine.js";
-import { Scheduler } from "./ddns/scheduler.js";
-import { registerAuthRoutes } from "./routes/auth.js";
-import { registerCloudflareRoutes } from "./routes/cloudflare.js";
-import { registerOperationRoutes } from "./routes/operations.js";
-import { registerRecordRoutes } from "./routes/records.js";
-import { registerSetupRoutes } from "./routes/setup.js";
-import { registerSecurity } from "./security/sessions.js";
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import type { PrismaClient } from '@ddns/database';
+import cookie from '@fastify/cookie';
+import helmet from '@fastify/helmet';
+import staticFiles from '@fastify/static';
+import Fastify from 'fastify';
+import { ZodError } from 'zod';
+import type { Config } from './config.js';
+import { DdnsEngine } from './ddns/engine.js';
+import { Scheduler } from './ddns/scheduler.js';
+import { RequestError } from './records/service.js';
+import { registerAuthRoutes } from './routes/auth.js';
+import { registerCloudflareRoutes } from './routes/cloudflare.js';
+import { registerOperationRoutes } from './routes/operations.js';
+import { registerRecordRoutes } from './routes/records.js';
+import { registerSetupRoutes } from './routes/setup.js';
+import { registerSecurity } from './security/sessions.js';
 
-export async function buildApp(db: PrismaClient, config: Config, options: { startScheduler?: boolean } = {}) {
+export async function buildApp(
+  db: PrismaClient,
+  config: Config,
+  options: { startScheduler?: boolean } = {}
+) {
   const app = Fastify({
-    logger: config.NODE_ENV !== "test",
+    logger: config.NODE_ENV !== 'test',
     trustProxy: true,
     bodyLimit: 64 * 1024,
-    requestTimeout: 30_000,
+    requestTimeout: 30_000
   });
   await app.register(cookie);
   await app.register(helmet, { contentSecurityPolicy: false });
@@ -35,37 +40,53 @@ export async function buildApp(db: PrismaClient, config: Config, options: { star
   registerRecordRoutes(app, db, config, engine, scheduler);
   registerOperationRoutes(app, db, config, engine, scheduler);
 
-  const webRoot = resolve(process.env.WEB_ROOT ?? "public");
+  const webRoot = resolve(process.env.WEB_ROOT ?? 'public');
   if (existsSync(webRoot)) {
     await app.register(staticFiles, { root: webRoot, wildcard: false });
   }
   app.setNotFoundHandler((request, reply) => {
-    if (existsSync(webRoot) && request.method === "GET" && !request.url.startsWith("/api/")) {
-      return reply.sendFile("index.html");
+    if (existsSync(webRoot) && request.method === 'GET' && !request.url.startsWith('/api/')) {
+      return reply.sendFile('index.html');
     }
     return reply.code(404).send({
-      error: { code: "NOT_FOUND", message: `No route for ${request.method} ${request.url}` },
+      error: { code: 'NOT_FOUND', message: `No route for ${request.method} ${request.url}` }
     });
   });
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {
       return reply.code(400).send({
-        error: { code: "VALIDATION_ERROR", message: "Request validation failed", details: error.issues },
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Request validation failed',
+          details: error.issues
+        }
       });
     }
-    const caught = error instanceof Error ? error : new Error("Unknown server error");
-    if ("code" in caught && caught.code === "P2002") {
+    if (error instanceof RequestError) {
+      return reply.code(error.status).send({
+        error: { code: error.code, message: error.message, details: error.details }
+      });
+    }
+    const caught = error instanceof Error ? error : new Error('Unknown server error');
+    if ('code' in caught && caught.code === 'P2002') {
       return reply.code(409).send({
-        error: { code: "DUPLICATE", message: "A record with the same account, zone, hostname, and type already exists" },
+        error: {
+          code: 'DUPLICATE',
+          message: 'A record with the same account, zone, hostname, and type already exists'
+        }
       });
     }
-    const statusCode = "status" in caught && typeof caught.status === "number" ? caught.status : 500;
+    const statusCode =
+      'status' in caught && typeof caught.status === 'number' ? caught.status : 500;
     if (statusCode >= 500) app.log.error(error);
     return reply.code(statusCode).send({
-      error: { code: statusCode >= 500 ? "INTERNAL_ERROR" : "REQUEST_ERROR", message: statusCode >= 500 ? "Internal server error" : caught.message },
+      error: {
+        code: statusCode >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR',
+        message: statusCode >= 500 ? 'Internal server error' : caught.message
+      }
     });
   });
-  app.addHook("onClose", async () => {
+  app.addHook('onClose', async () => {
     scheduler.stop();
     await db.$disconnect();
   });

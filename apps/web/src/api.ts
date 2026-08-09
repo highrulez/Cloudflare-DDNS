@@ -2,6 +2,7 @@ export type User = { id: string; username: string };
 export type Status = 'healthy' | 'updating' | 'degraded' | 'disabled' | 'error';
 export type Dashboard = {
   currentIp?: string;
+  currentIpv6?: string;
   status: Status;
   lastCheckedAt?: string;
   lastChangedAt?: string;
@@ -17,12 +18,48 @@ export type Account = {
   tokenHint: string;
   status: Status;
   zones: number;
-  zoneItems: Array<{ id: string; name: string; cloudflareId: string; status: string }>;
+  zoneItems: Zone[];
   lastTestedAt?: string;
+};
+export type Zone = {
+  id: string;
+  name: string;
+  cloudflareId: string;
+  status: string;
+  recordCount: number;
+  managedCount: number;
+  lastSyncedAt?: string;
+};
+export type PublicIp = { ipv4: string | null; ipv6: string | null; detectedAt?: string };
+export type DiscoveredRecord = {
+  id: string;
+  type: 'A' | 'AAAA';
+  name: string;
+  content: string;
+  proxied: boolean;
+  ttl: number;
+  managed: boolean;
+  managedRecordId: string | null;
+  ddnsEnabled: boolean;
+  detectedIp: string | null;
+  syncStatus: 'SYNCHRONIZED' | 'NEEDS_UPDATE' | 'NO_PUBLIC_IP';
+};
+export type ZoneDiscovery = { zone: Zone; publicIp: PublicIp; items: DiscoveredRecord[] };
+export type CreateDnsRecord = {
+  accountId: string;
+  zoneId: string;
+  hostname: string;
+  type: 'A' | 'AAAA';
+  ipSource: 'DETECTED_IPV4' | 'DETECTED_IPV6' | 'CUSTOM';
+  customIp?: string;
+  proxied: boolean;
+  ttl: number;
+  ddnsEnabled: boolean;
 };
 export type RecordItem = {
   id: string;
   accountId: string;
+  accountName?: string;
   zoneId: string;
   cloudflareRecordId?: string;
   zoneName: string;
@@ -40,7 +77,8 @@ export type HistoryItem = {
   id: string;
   recordName?: string;
   zoneName?: string;
-  action: 'check' | 'update' | 'force-update' | 'configuration';
+  action:
+    'check' | 'update' | 'force-update' | 'configuration' | 'create' | 'stop-managing' | 'delete';
   status: 'success' | 'failed' | 'skipped' | 'pending';
   oldValue?: string;
   newValue?: string;
@@ -59,22 +97,39 @@ export type Settings = {
 export type Page<T> = { items: T[]; page: number; pageSize: number; total: number };
 
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number, readonly code?: string) {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly details?: unknown
+  ) {
     super(message);
   }
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const headers = new Headers(init.headers);
+  headers.set('Accept', 'application/json');
+  if (init.body !== undefined) headers.set('Content-Type', 'application/json');
   const response = await fetch(`/api${path}`, {
     ...init,
     credentials: 'include',
-    headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init.headers }
+    headers
   });
   if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { message?: string; error?: { message?: string }; code?: string };
-    throw new ApiError(body.message ?? body.error?.message ?? `Request failed (${response.status})`, response.status, body.code);
+    const body = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      error?: { message?: string; code?: string; details?: unknown };
+      code?: string;
+    };
+    throw new ApiError(
+      body.message ?? body.error?.message ?? `Request failed (${response.status})`,
+      response.status,
+      body.error?.code ?? body.code,
+      body.error?.details
+    );
   }
-  return response.status === 204 ? undefined as T : await response.json() as T;
+  return response.status === 204 ? (undefined as T) : ((await response.json()) as T);
 }
 
 const body = (method: string, data?: unknown): RequestInit => ({
@@ -90,44 +145,97 @@ export const api = {
   setupAdmin: (data: { username: string; password: string }) =>
     request<{ id: string; username: string; step: number }>('/setup/admin', body('POST', data)),
   setupCloudflare: (data: { name: string; token: string }) =>
-    request<{ id: string; zones: Array<{ id: string; name: string }> }>('/setup/cloudflare', body('POST', data)),
+    request<{
+      id: string;
+      zones: Array<{
+        id: string;
+        name: string;
+        cloudflareId: string;
+        status: string;
+        recordCount: number;
+        lastSyncedAt?: string;
+      }>;
+    }>('/setup/cloudflare', body('POST', data)),
+  setupAccounts: async () => {
+    const result = await request<{
+      items: Array<{ id: string; name: string; zones: Array<Record<string, unknown>> }>;
+    }>('/setup/cloudflare/accounts');
+    return {
+      accounts: result.items.map((account) => ({
+        id: account.id,
+        name: account.name,
+        tokenHint: '',
+        status: 'healthy' as const,
+        zones: account.zones.length,
+        zoneItems: account.zones.map(mapZone)
+      }))
+    };
+  },
+  setupIp: () => request<PublicIp>('/setup/ip'),
+  setupZoneRecords: (accountId: string, zoneId: string) =>
+    request<ZoneDiscovery>(`/setup/cloudflare/${accountId}/zones/${zoneId}/records`),
+  setupManageRecords: (
+    records: Array<{
+      accountId: string;
+      zoneId: string;
+      cloudflareRecordId: string;
+      ddnsEnabled: boolean;
+    }>
+  ) => request<{ items: RecordItem[] }>('/setup/records/manage', body('POST', { records })),
+  setupCreateRecord: (data: CreateDnsRecord) =>
+    request<RecordItem>('/setup/records', body('POST', data)),
   setupRecord: (data: {
     accountId: string;
     zoneId: string;
     type: 'A' | 'AAAA';
     hostname: string;
     content: string;
-  }) => request<RecordItem>('/setup/record', body('POST', {
-    ...data,
-    proxied: false,
-    ttl: 1,
-    enabled: true,
-    automatic: true
-  })),
-  setupSettings: (intervalMinutes: number) => request<Settings>('/setup/settings', body('PUT', {
-    intervalMinutes,
-    ipv4Enabled: true,
-    ipv6Enabled: false,
-    automaticUpdates: true,
-    providerPolicy: 'ordered',
-    requestTimeoutMs: 5000,
-    retentionDays: 90,
-    timezone: 'Asia/Kuala_Lumpur'
-  })),
+  }) =>
+    request<RecordItem>(
+      '/setup/records',
+      body('POST', {
+        accountId: data.accountId,
+        zoneId: data.zoneId,
+        hostname: data.hostname,
+        type: data.type,
+        ipSource: 'CUSTOM',
+        customIp: data.content,
+        proxied: false,
+        ttl: 1,
+        ddnsEnabled: true
+      })
+    ),
+  setupSettings: (intervalMinutes: number, ipv4Enabled = true, ipv6Enabled = false) =>
+    request<Settings>(
+      '/setup/settings',
+      body('PUT', {
+        intervalMinutes,
+        ipv4Enabled,
+        ipv6Enabled,
+        automaticUpdates: true,
+        providerPolicy: 'ordered',
+        requestTimeoutMs: 5000,
+        retentionDays: 90,
+        timezone: 'Asia/Kuala_Lumpur'
+      })
+    ),
   completeSetup: () => request<{ completed: boolean }>('/setup/complete', body('POST')),
   me: () => request<{ user: User }>('/auth/me'),
-  login: (username: string, password: string) => request<{ user: User }>('/auth/login', body('POST', { username, password })),
+  login: (username: string, password: string) =>
+    request<{ user: User }>('/auth/login', body('POST', { username, password })),
   logout: () => request<void>('/auth/logout', body('POST')),
   dashboard: async (): Promise<Dashboard> => {
     const result = await request<{
-      currentIp: { ipv4?: string; detectedAt?: string };
+      currentIp: { ipv4?: string; ipv6?: string; detectedAt?: string };
       scheduler?: { running?: boolean; nextCheckAt?: string };
       records: { total: number; byHealth: Record<string, number> };
       recentActivity: Array<Record<string, unknown>>;
     }>('/dashboard');
-    const failedRecords = (result.records.byHealth.ERROR ?? 0) + (result.records.byHealth.DRIFTED ?? 0);
+    const failedRecords =
+      (result.records.byHealth.ERROR ?? 0) + (result.records.byHealth.DRIFTED ?? 0);
     return {
       currentIp: result.currentIp.ipv4,
+      currentIpv6: result.currentIp.ipv6,
       status: result.scheduler?.running ? 'updating' : failedRecords ? 'degraded' : 'healthy',
       lastCheckedAt: result.currentIp.detectedAt,
       nextCheckAt: result.scheduler?.nextCheckAt,
@@ -139,69 +247,112 @@ export const api = {
   },
   checkAll: () => request<unknown>('/ddns/check', body('POST')),
   forceAll: () => request<unknown>('/ddns/force', body('POST', { confirm: true })),
+  detectIp: () => request<PublicIp>('/ip/detect', body('POST')),
   accounts: async () => {
     const result = await request<{ items: Array<Record<string, unknown>> }>('/cloudflare/accounts');
     return { accounts: result.items.map(mapAccount) };
   },
   addAccount: async (data: { name: string; token: string }) => ({
-    account: mapAccount(await request<Record<string, unknown>>('/cloudflare/accounts', body('POST', data)))
+    account: mapAccount(
+      await request<Record<string, unknown>>('/cloudflare/accounts', body('POST', data))
+    )
   }),
   updateAccount: async (id: string, data: { name: string; token?: string }) => ({
-    account: mapAccount(await request<Record<string, unknown>>(`/cloudflare/accounts/${id}`, body('PATCH', data)))
+    account: mapAccount(
+      await request<Record<string, unknown>>(`/cloudflare/accounts/${id}`, body('PATCH', data))
+    )
   }),
-  testAccount: (id: string) => request<{ valid: boolean }>(`/cloudflare/accounts/${id}/test`, body('POST')),
-  syncAccount: (id: string) => request<unknown>(`/cloudflare/accounts/${id}/zones/refresh`, body('POST')),
+  testAccount: (id: string) =>
+    request<{ valid: boolean }>(`/cloudflare/accounts/${id}/test`, body('POST')),
+  syncAccount: (id: string) =>
+    request<unknown>(`/cloudflare/accounts/${id}/zones/refresh`, body('POST')),
   zoneRecords: (accountId: string, zoneId: string) =>
-    request<{ items: Array<{ id: string; type: 'A' | 'AAAA'; name: string; content: string; proxied: boolean; ttl: number }> }>(
-      `/cloudflare/accounts/${accountId}/zones/${zoneId}/records`
-    ),
+    request<ZoneDiscovery>(`/cloudflare/accounts/${accountId}/zones/${zoneId}/records`),
   deleteAccount: (id: string) => request<void>(`/cloudflare/accounts/${id}`, body('DELETE')),
-  records: async () => {
-    const result = await request<{ items: Array<Record<string, unknown>> }>('/records');
+  records: async (query?: URLSearchParams) => {
+    const result = await request<{ items: Array<Record<string, unknown>> }>(
+      `/records${query ? `?${query}` : ''}`
+    );
     return { records: result.items.map(mapRecord) };
   },
-  createRecord: async (data: Omit<RecordItem, 'id' | 'status' | 'lastCheckedAt' | 'lastUpdatedAt'>) => ({
-    record: mapRecord(await request<Record<string, unknown>>('/records', body('POST', {
-      accountId: data.accountId,
-      zoneId: data.zoneId,
-      cloudflareRecordId: data.cloudflareRecordId,
-      type: data.type,
-      hostname: data.name,
-      content: data.content,
-      ttl: data.ttl,
-      proxied: data.proxied,
-      enabled: data.enabled,
-      automatic: true
-    })))
-  }),
+  createRecord: async (
+    data: CreateDnsRecord | Omit<RecordItem, 'id' | 'status' | 'lastCheckedAt' | 'lastUpdatedAt'>
+  ) => {
+    const input: CreateDnsRecord =
+      'ipSource' in data
+        ? data
+        : {
+            accountId: data.accountId,
+            zoneId: data.zoneId,
+            hostname: data.name,
+            type: data.type,
+            ipSource: 'CUSTOM',
+            customIp: data.content,
+            proxied: data.proxied,
+            ttl: data.ttl,
+            ddnsEnabled: data.enabled
+          };
+    return {
+      record: mapRecord(await request<Record<string, unknown>>('/records', body('POST', input)))
+    };
+  },
+  manageRecords: async (
+    records: Array<{
+      accountId: string;
+      zoneId: string;
+      cloudflareRecordId: string;
+      ddnsEnabled: boolean;
+    }>
+  ) => {
+    const result = await request<{ items: Array<Record<string, unknown>> }>(
+      '/records/manage',
+      body('POST', { records })
+    );
+    return { records: result.items.map(mapRecord) };
+  },
   updateRecord: async (id: string, data: Partial<RecordItem>) => ({
-    record: mapRecord(await request<Record<string, unknown>>(`/records/${id}`, body('PATCH', {
-      ...(data.name ? { hostname: data.name } : {}),
-      ...(data.ttl !== undefined ? { ttl: data.ttl } : {}),
-      ...(data.proxied !== undefined ? { proxied: data.proxied } : {}),
-      ...(data.enabled !== undefined ? { enabled: data.enabled } : {})
-    })))
+    record: mapRecord(
+      await request<Record<string, unknown>>(
+        `/records/${id}`,
+        body('PATCH', {
+          ...(data.name ? { hostname: data.name } : {}),
+          ...(data.ttl !== undefined ? { ttl: data.ttl } : {}),
+          ...(data.proxied !== undefined ? { proxied: data.proxied } : {}),
+          ...(data.enabled !== undefined ? { enabled: data.enabled } : {})
+        })
+      )
+    )
   }),
   toggleRecord: async (id: string, enabled: boolean) => ({
-    record: mapRecord(await request<Record<string, unknown>>(`/records/${id}`, body('PATCH', { enabled })))
+    record: mapRecord(
+      await request<Record<string, unknown>>(`/records/${id}`, body('PATCH', { enabled }))
+    )
   }),
   checkRecord: (id: string) => request<unknown>(`/records/${id}/check`, body('POST')),
   forceRecord: (id: string) => request<unknown>(`/records/${id}/force`, body('POST')),
+  stopManagingRecord: (id: string) => request<void>(`/records/${id}`, body('DELETE')),
   deleteRecord: (id: string) => request<void>(`/records/${id}`, body('DELETE')),
+  deleteCloudflareRecord: (id: string, confirmation: string) =>
+    request<void>(`/records/${id}/cloudflare`, body('DELETE', { confirmation })),
   history: async (query: URLSearchParams) => {
     const result = await request<Page<Record<string, unknown>>>(`/history/logs?${query}`);
     return { ...result, items: result.items.map(mapHistory) };
   },
   settings: () => request<Settings>('/settings'),
   updateSettings: async (data: Settings) => ({
-    settings: await request<Settings>('/settings', body('PUT', { ...data, providerPolicy: 'ordered' }))
+    settings: await request<Settings>(
+      '/settings',
+      body('PUT', { ...data, providerPolicy: 'ordered' })
+    )
   }),
-  updateProfile: (data: { username: string }) => request<{ user: User }>('/auth/profile', body('PATCH', data)),
-  changePassword: (data: { currentPassword: string; newPassword: string }) => request<void>('/auth/password', body('PUT', data))
+  updateProfile: (data: { username: string }) =>
+    request<{ user: User }>('/auth/profile', body('PATCH', data)),
+  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+    request<void>('/auth/password', body('PUT', data))
 };
 
 function mapAccount(value: Record<string, unknown>): Account {
-  const zones = Array.isArray(value.zones) ? value.zones as Account['zoneItems'] : [];
+  const zones = Array.isArray(value.zones) ? value.zones.map(mapZone) : [];
   return {
     id: String(value.id),
     name: String(value.name),
@@ -213,12 +364,27 @@ function mapAccount(value: Record<string, unknown>): Account {
   };
 }
 
+function mapZone(zoneValue: unknown): Zone {
+  const zone = zoneValue as Record<string, unknown>;
+  const count = zone._count as { records?: number } | undefined;
+  return {
+    id: String(zone.id),
+    name: String(zone.name),
+    cloudflareId: String(zone.cloudflareId),
+    status: String(zone.status),
+    recordCount: Number(zone.recordCount ?? 0),
+    managedCount: Number(count?.records ?? 0),
+    lastSyncedAt: zone.lastSyncedAt ? String(zone.lastSyncedAt) : undefined
+  };
+}
+
 function mapRecord(value: Record<string, unknown>): RecordItem {
   const zone = value.zone as { name?: string } | undefined;
   const health = String(value.health ?? 'UNKNOWN');
   return {
     id: String(value.id),
     accountId: String(value.accountId),
+    accountName: String((value.account as { name?: string } | undefined)?.name ?? ''),
     zoneId: String(value.zoneId),
     cloudflareRecordId: value.cloudflareRecordId ? String(value.cloudflareRecordId) : undefined,
     zoneName: zone?.name ?? '',
@@ -228,7 +394,13 @@ function mapRecord(value: Record<string, unknown>): RecordItem {
     ttl: Number(value.ttl ?? 1),
     proxied: Boolean(value.proxied),
     enabled: Boolean(value.enabled),
-    status: !value.enabled ? 'disabled' : health === 'HEALTHY' ? 'healthy' : health === 'ERROR' ? 'error' : 'degraded',
+    status: !value.enabled
+      ? 'disabled'
+      : health === 'HEALTHY'
+        ? 'healthy'
+        : health === 'ERROR'
+          ? 'error'
+          : 'degraded',
     lastCheckedAt: value.lastCheckedAt ? String(value.lastCheckedAt) : undefined,
     lastUpdatedAt: value.lastUpdatedAt ? String(value.lastUpdatedAt) : undefined
   };
@@ -240,7 +412,18 @@ function mapHistory(value: Record<string, unknown>): HistoryItem {
   return {
     id: String(value.id),
     recordName: value.hostname ? String(value.hostname) : undefined,
-    action: action === 'UPDATED' ? 'update' : action === 'FAILED' ? 'configuration' : 'check',
+    action:
+      action === 'UPDATED'
+        ? 'update'
+        : action === 'CREATED'
+          ? 'create'
+          : action === 'STOPPED_MANAGING'
+            ? 'stop-managing'
+            : action === 'DELETED'
+              ? 'delete'
+              : action === 'FAILED'
+                ? 'configuration'
+                : 'check',
     status: result === 'ERROR' ? 'failed' : result === 'UNCHANGED' ? 'skipped' : 'success',
     oldValue: value.previousIp ? String(value.previousIp) : undefined,
     newValue: value.newIp ? String(value.newIp) : undefined,

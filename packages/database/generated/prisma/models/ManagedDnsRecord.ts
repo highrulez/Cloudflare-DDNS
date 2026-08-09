@@ -353,6 +353,7 @@ export type ManagedDnsRecordOrderByWithRelationInput = {
 export type ManagedDnsRecordWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   accountId_zoneId_normalizedHostname_type?: Prisma.ManagedDnsRecordAccountIdZoneIdNormalizedHostnameTypeCompoundUniqueInput
+  zoneId_cloudflareRecordId?: Prisma.ManagedDnsRecordZoneIdCloudflareRecordIdCompoundUniqueInput
   AND?: Prisma.ManagedDnsRecordWhereInput | Prisma.ManagedDnsRecordWhereInput[]
   OR?: Prisma.ManagedDnsRecordWhereInput[]
   NOT?: Prisma.ManagedDnsRecordWhereInput | Prisma.ManagedDnsRecordWhereInput[]
@@ -376,7 +377,7 @@ export type ManagedDnsRecordWhereUniqueInput = Prisma.AtLeast<{
   account?: Prisma.XOR<Prisma.CloudflareAccountScalarRelationFilter, Prisma.CloudflareAccountWhereInput>
   zone?: Prisma.XOR<Prisma.CloudflareZoneScalarRelationFilter, Prisma.CloudflareZoneWhereInput>
   logs?: Prisma.DdnsUpdateLogListRelationFilter
-}, "id" | "accountId_zoneId_normalizedHostname_type">
+}, "id" | "accountId_zoneId_normalizedHostname_type" | "zoneId_cloudflareRecordId">
 
 export type ManagedDnsRecordOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -598,6 +599,11 @@ export type ManagedDnsRecordAccountIdZoneIdNormalizedHostnameTypeCompoundUniqueI
   zoneId: string
   normalizedHostname: string
   type: $Enums.RecordType
+}
+
+export type ManagedDnsRecordZoneIdCloudflareRecordIdCompoundUniqueInput = {
+  zoneId: string
+  cloudflareRecordId: string
 }
 
 export type ManagedDnsRecordCountOrderByAggregateInput = {
@@ -903,7 +909,6 @@ export type ManagedDnsRecordCreateWithoutZoneInput = {
 
 export type ManagedDnsRecordUncheckedCreateWithoutZoneInput = {
   id?: string
-  accountId: string
   cloudflareRecordId?: string | null
   type: $Enums.RecordType
   hostname: string
@@ -1132,7 +1137,6 @@ export type ManagedDnsRecordUncheckedUpdateManyWithoutAccountInput = {
 
 export type ManagedDnsRecordCreateManyZoneInput = {
   id?: string
-  accountId: string
   cloudflareRecordId?: string | null
   type: $Enums.RecordType
   hostname: string
@@ -1173,7 +1177,6 @@ export type ManagedDnsRecordUpdateWithoutZoneInput = {
 
 export type ManagedDnsRecordUncheckedUpdateWithoutZoneInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  accountId?: Prisma.StringFieldUpdateOperationsInput | string
   cloudflareRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   type?: Prisma.EnumRecordTypeFieldUpdateOperationsInput | $Enums.RecordType
   hostname?: Prisma.StringFieldUpdateOperationsInput | string
@@ -1194,7 +1197,6 @@ export type ManagedDnsRecordUncheckedUpdateWithoutZoneInput = {
 
 export type ManagedDnsRecordUncheckedUpdateManyWithoutZoneInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  accountId?: Prisma.StringFieldUpdateOperationsInput | string
   cloudflareRecordId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   type?: Prisma.EnumRecordTypeFieldUpdateOperationsInput | $Enums.RecordType
   hostname?: Prisma.StringFieldUpdateOperationsInput | string

@@ -1,4 +1,4 @@
-const API = "https://api.cloudflare.com/client/v4";
+const API = 'https://api.cloudflare.com/client/v4';
 
 interface Envelope<T> {
   success: boolean;
@@ -15,7 +15,7 @@ export interface CloudflareZoneDto {
 
 export interface CloudflareRecordDto {
   id: string;
-  type: "A" | "AAAA";
+  type: 'A' | 'AAAA';
   name: string;
   content: string;
   proxied: boolean;
@@ -27,7 +27,7 @@ export class CloudflareError extends Error {
     message: string,
     readonly status: number,
     readonly requestId?: string,
-    readonly retryable = false,
+    readonly retryable = false
   ) {
     super(message);
   }
@@ -42,30 +42,38 @@ export class CloudflareClient {
     private readonly fetcher: typeof fetch = fetch,
     private readonly timeoutMs = 8_000,
     private readonly maxAttempts = 4,
-    private readonly apiBase = API,
+    private readonly apiBase = API
   ) {}
 
-  private async request<T>(path: string, init: RequestInit = {}): Promise<{ data: T; requestId?: string }> {
+  private async request<T>(
+    path: string,
+    init: RequestInit = {}
+  ): Promise<{ data: T; requestId?: string }> {
     let lastError: unknown;
     for (let attempt = 0; attempt < this.maxAttempts; attempt += 1) {
       try {
-        const response = await this.fetcher(`${this.apiBase.replace(/\/$/, "")}${path}`, {
+        const headers = new Headers(init.headers);
+        headers.set('authorization', `Bearer ${this.token}`);
+        if (init.body !== undefined) headers.set('content-type', 'application/json');
+        const response = await this.fetcher(`${this.apiBase.replace(/\/$/, '')}${path}`, {
           ...init,
           signal: AbortSignal.timeout(this.timeoutMs),
-          headers: {
-            authorization: `Bearer ${this.token}`,
-            "content-type": "application/json",
-            ...init.headers,
-          },
+          headers
         });
-        const requestId = response.headers.get("cf-ray") ?? undefined;
+        const requestId = response.headers.get('cf-ray') ?? undefined;
         const body = (await response.json().catch(() => null)) as Envelope<T> | null;
         if (!response.ok || !body?.success) {
-          const message = body?.errors?.map((error) => error.message).join("; ") || `Cloudflare returned HTTP ${response.status}`;
+          const message =
+            body?.errors?.map((error) => error.message).join('; ') ||
+            `Cloudflare returned HTTP ${response.status}`;
           const retryable = retryableStatus.has(response.status);
           if (retryable && attempt + 1 < this.maxAttempts) {
-            const retryAfter = Number(response.headers.get("retry-after"));
-            await sleep(Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : [2_000, 5_000, 10_000][attempt]!);
+            const retryAfter = Number(response.headers.get('retry-after'));
+            await sleep(
+              Number.isFinite(retryAfter) && retryAfter > 0
+                ? retryAfter * 1000
+                : [2_000, 5_000, 10_000][attempt]!
+            );
             continue;
           }
           throw new CloudflareError(message, response.status, requestId, retryable);
@@ -80,11 +88,16 @@ export class CloudflareClient {
         }
       }
     }
-    throw new CloudflareError(lastError instanceof Error ? lastError.message : "Cloudflare request failed", 0, undefined, true);
+    throw new CloudflareError(
+      lastError instanceof Error ? lastError.message : 'Cloudflare request failed',
+      0,
+      undefined,
+      true
+    );
   }
 
   async verifyToken() {
-    return (await this.request<{ id: string; status: string }>("/user/tokens/verify")).data;
+    return (await this.request<{ id: string; status: string }>('/user/tokens/verify')).data;
   }
 
   async listZones(): Promise<CloudflareZoneDto[]> {
@@ -100,34 +113,59 @@ export class CloudflareClient {
     const records: CloudflareRecordDto[] = [];
     for (let page = 1; ; page += 1) {
       const response = await this.request<CloudflareRecordDto[]>(
-        `/zones/${encodeURIComponent(zoneId)}/dns_records?page=${page}&per_page=100`,
+        `/zones/${encodeURIComponent(zoneId)}/dns_records?page=${page}&per_page=100`
       );
-      records.push(...response.data.filter((record) => record.type === "A" || record.type === "AAAA"));
+      records.push(
+        ...response.data.filter((record) => record.type === 'A' || record.type === 'AAAA')
+      );
       if (response.data.length < 100) return records;
     }
   }
 
   async getRecord(zoneId: string, recordId: string) {
-    return (await this.request<CloudflareRecordDto>(
-      `/zones/${encodeURIComponent(zoneId)}/dns_records/${encodeURIComponent(recordId)}`,
-    )).data;
+    return (
+      await this.request<CloudflareRecordDto>(
+        `/zones/${encodeURIComponent(zoneId)}/dns_records/${encodeURIComponent(recordId)}`
+      )
+    ).data;
   }
 
-  async createRecord(zoneId: string, input: Omit<CloudflareRecordDto, "id">) {
+  async findRecords(zoneId: string, type: 'A' | 'AAAA', name: string) {
+    const query = new URLSearchParams({ type, name, page: '1', per_page: '100' });
+    return (
+      await this.request<CloudflareRecordDto[]>(
+        `/zones/${encodeURIComponent(zoneId)}/dns_records?${query}`
+      )
+    ).data.filter(
+      (record) => record.type === type && record.name.toLowerCase() === name.toLowerCase()
+    );
+  }
+
+  async createRecord(zoneId: string, input: Omit<CloudflareRecordDto, 'id'>) {
     return this.request<CloudflareRecordDto>(`/zones/${encodeURIComponent(zoneId)}/dns_records`, {
-      method: "POST",
-      body: JSON.stringify(input),
+      method: 'POST',
+      body: JSON.stringify(input)
     });
   }
 
   async patchRecord(
     zoneId: string,
     recordId: string,
-    update: string | Partial<Pick<CloudflareRecordDto, "name" | "content" | "proxied" | "ttl">>,
+    update: string | Partial<Pick<CloudflareRecordDto, 'name' | 'content' | 'proxied' | 'ttl'>>
   ) {
     return this.request<CloudflareRecordDto>(
       `/zones/${encodeURIComponent(zoneId)}/dns_records/${encodeURIComponent(recordId)}`,
-      { method: "PATCH", body: JSON.stringify(typeof update === "string" ? { content: update } : update) },
+      {
+        method: 'PATCH',
+        body: JSON.stringify(typeof update === 'string' ? { content: update } : update)
+      }
+    );
+  }
+
+  async deleteRecord(zoneId: string, recordId: string) {
+    return this.request<{ id: string }>(
+      `/zones/${encodeURIComponent(zoneId)}/dns_records/${encodeURIComponent(recordId)}`,
+      { method: 'DELETE' }
     );
   }
 }

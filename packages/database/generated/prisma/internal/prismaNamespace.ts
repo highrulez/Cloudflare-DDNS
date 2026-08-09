@@ -1383,6 +1383,8 @@ export const CloudflareZoneScalarFieldEnum = {
   cloudflareId: 'cloudflareId',
   name: 'name',
   status: 'status',
+  recordCount: 'recordCount',
+  lastSyncedAt: 'lastSyncedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
