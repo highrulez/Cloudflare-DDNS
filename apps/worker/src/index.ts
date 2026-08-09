@@ -39,7 +39,7 @@ const cacheConnection = new Redis(config.REDIS_URL, {
   connectTimeout: config.REDIS_CONNECT_TIMEOUT_MS,
   commandTimeout: config.REDIS_COMMAND_TIMEOUT_MS,
   maxRetriesPerRequest: 1,
-  enableOfflineQueue: false,
+  enableOfflineQueue: true,
   retryStrategy: workerRedisOptions.retryStrategy
 });
 const providers = createProviderRegistry(config.CLOUDFLARE_API_BASE);

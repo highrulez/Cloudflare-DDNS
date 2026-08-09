@@ -34,6 +34,20 @@ describe('worker configuration', () => {
     expect(config.DATABASE_URL).toContain('/infrahub');
     expect(config.APP_ENCRYPTION_KEY).toHaveLength(32);
   });
+
+  it('accepts authenticated Redis URLs and rejects non-Redis protocols', () => {
+    const env = {
+      DATABASE_URL: 'mysql://infrahub_app:password@192.168.68.100:3306/infrahub',
+      APP_ENCRYPTION_KEY: Buffer.alloc(32, 3).toString('base64')
+    };
+    expect(
+      loadWorkerConfig({
+        ...env,
+        REDIS_URL: 'rediss://user:password@redis.example.com:6380'
+      }).REDIS_URL
+    ).toBe('rediss://user:password@redis.example.com:6380');
+    expect(() => loadWorkerConfig({ ...env, REDIS_URL: 'https://redis.example.com' })).toThrow();
+  });
 });
 
 describe('Cloudflare provider mapping', () => {

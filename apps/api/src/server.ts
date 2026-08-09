@@ -35,15 +35,51 @@ const envFile = [resolve(process.cwd(), '.env'), resolve(process.cwd(), '../../.
 );
 if (envFile) loadDotenv({ path: envFile, quiet: true });
 const config = loadConfig();
+const parsedRedisUrl = new URL(config.REDIS_URL);
+const redisConnectionDetails = {
+  host: parsedRedisUrl.hostname,
+  port: Number(parsedRedisUrl.port || (parsedRedisUrl.protocol === 'rediss:' ? 6380 : 6379)),
+  tls: parsedRedisUrl.protocol === 'rediss:',
+  authenticationConfigured: Boolean(parsedRedisUrl.username || parsedRedisUrl.password)
+};
+
+function redisLog(
+  level: 'info' | 'error',
+  event: string,
+  client: string,
+  details: Record<string, unknown> = {}
+): void {
+  const entry = JSON.stringify({ event, client, ...details });
+  if (level === 'error') console.error(entry);
+  else console.info(entry);
+}
+
 const redisOptions = {
   connectTimeout: config.REDIS_CONNECT_TIMEOUT_MS,
   commandTimeout: config.REDIS_COMMAND_TIMEOUT_MS,
   maxRetriesPerRequest: 1,
-  enableOfflineQueue: false,
+  enableOfflineQueue: true,
   retryStrategy: (attempt: number) => Math.min(attempt * 200, 2_000)
 } as const;
+
+redisLog('info', 'redis.connecting', 'request', redisConnectionDetails);
 const redis = new Redis(config.REDIS_URL, redisOptions);
+redisLog('info', 'redis.connecting', 'queue', redisConnectionDetails);
 const queueRedis = new Redis(config.REDIS_URL, redisOptions);
+
+function attachRedisEventLogging(client: Redis, name: string): void {
+  client.on('connect', () => redisLog('info', 'redis.connected', name));
+  client.on('ready', () => redisLog('info', 'redis.ready', name));
+  client.on('error', (error) => redisLog('error', 'redis.error', name, { message: error.message }));
+  client.on('close', () => redisLog('info', 'redis.close', name));
+  client.on('reconnecting', (delay: number) =>
+    redisLog('info', 'redis.reconnecting', name, { delayMs: delay })
+  );
+  client.on('end', () => redisLog('info', 'redis.end', name));
+}
+
+attachRedisEventLogging(redis, 'request');
+attachRedisEventLogging(queueRedis, 'queue');
 const dnsQueue = new Queue<ConnectionJob>(QUEUES.dns, { connection: queueRedis });
 const systemQueue = new Queue(QUEUES.system, { connection: queueRedis });
 const providers = createProviderRegistry(config.CLOUDFLARE_API_BASE);
@@ -96,6 +132,47 @@ async function withTimeout<T>(
   }
 }
 
+async function waitForRedisReady(client: Redis, name: string): Promise<void> {
+  if (client.status === 'ready') return;
+  await withTimeout(
+    new Promise<void>((resolveReady, rejectReady) => {
+      const cleanup = () => {
+        client.off('ready', onReady);
+        client.off('error', onError);
+        client.off('end', onEnd);
+      };
+      const onReady = () => {
+        cleanup();
+        resolveReady();
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        rejectReady(error);
+      };
+      const onEnd = () => {
+        cleanup();
+        rejectReady(new Error(`Redis ${name} client ended before becoming ready`));
+      };
+      client.once('ready', onReady);
+      client.once('error', onError);
+      client.once('end', onEnd);
+    }),
+    config.REDIS_CONNECT_TIMEOUT_MS,
+    `Redis ${name} startup`
+  );
+}
+
+function requireRedisReady(): void {
+  if (redis.status !== 'ready') {
+    throw new HttpError(503, 'REDIS_UNAVAILABLE', 'Redis is temporarily unavailable');
+  }
+}
+
+async function redisCommand<T>(name: string, operation: () => Promise<T>): Promise<T> {
+  requireRedisReady();
+  return withTimeout(operation(), config.REDIS_COMMAND_TIMEOUT_MS, name);
+}
+
 async function loginStage<T>(
   request: FastifyRequest,
   event: string,
@@ -140,31 +217,29 @@ async function writeSession(
   token: string,
   user: { id: string; sessionVersion: number }
 ): Promise<void> {
-  await redis.set(
-    sessionKey(token),
-    JSON.stringify({
-      userId: user.id,
-      sessionVersion: user.sessionVersion
-    }),
-    'EX',
-    config.SESSION_TTL_SECONDS
+  await redisCommand('Redis session write', () =>
+    redis.set(
+      sessionKey(token),
+      JSON.stringify({
+        userId: user.id,
+        sessionVersion: user.sessionVersion
+      }),
+      'EX',
+      config.SESSION_TTL_SECONDS
+    )
   );
 }
 
 async function authenticate(request: FastifyRequest): Promise<void> {
   const token = request.cookies[config.COOKIE_NAME];
   if (!token) throw new HttpError(401, 'UNAUTHENTICATED', 'Authentication required');
-  const raw = await withTimeout(
-    redis.get(sessionKey(token)),
-    config.REDIS_COMMAND_TIMEOUT_MS,
-    'Redis session lookup'
-  );
+  const raw = await redisCommand('Redis session lookup', () => redis.get(sessionKey(token)));
   if (!raw) throw new HttpError(401, 'SESSION_EXPIRED', 'Session expired');
   let data: { userId: string; sessionVersion: number };
   try {
     data = JSON.parse(raw) as typeof data;
   } catch {
-    await redis.del(sessionKey(token));
+    await redisCommand('Redis invalid-session cleanup', () => redis.del(sessionKey(token)));
     throw new HttpError(401, 'SESSION_INVALID', 'Session invalid');
   }
   const user = await withTimeout(
@@ -173,7 +248,7 @@ async function authenticate(request: FastifyRequest): Promise<void> {
     'MariaDB session lookup'
   );
   if (!user || user.sessionVersion !== data.sessionVersion) {
-    await redis.del(sessionKey(token));
+    await redisCommand('Redis stale-session cleanup', () => redis.del(sessionKey(token)));
     throw new HttpError(401, 'SESSION_INVALID', 'Session invalid');
   }
   request.sessionToken = token;
@@ -183,10 +258,8 @@ async function authenticate(request: FastifyRequest): Promise<void> {
     displayName: user.displayName,
     mustChangePassword: user.mustChangePassword
   };
-  await withTimeout(
-    redis.expire(sessionKey(token), config.SESSION_TTL_SECONDS),
-    config.REDIS_COMMAND_TIMEOUT_MS,
-    'Redis session renewal'
+  await redisCommand('Redis session renewal', () =>
+    redis.expire(sessionKey(token), config.SESSION_TTL_SECONDS)
   );
 }
 
@@ -306,25 +379,18 @@ async function verifyRedisIntegration(): Promise<void> {
   const startedAt = performance.now();
   const key = `infra-hub:startup:${randomBytes(12).toString('hex')}`;
   const value = randomBytes(16).toString('hex');
-  await withTimeout(redis.ping(), config.REDIS_COMMAND_TIMEOUT_MS, 'Redis PING');
+  await Promise.all([waitForRedisReady(redis, 'request'), waitForRedisReady(queueRedis, 'queue')]);
+  redisLog('info', 'redis.authentication.success', 'request', {
+    authenticationConfigured: redisConnectionDetails.authenticationConfigured
+  });
+  await redisCommand('Redis startup PING', () => redis.ping());
+  redisLog('info', 'redis.ping.success', 'request');
   try {
-    await withTimeout(
-      redis.set(key, value, 'PX', 10_000),
-      config.REDIS_COMMAND_TIMEOUT_MS,
-      'Redis startup SET'
-    );
-    const stored = await withTimeout(
-      redis.get(key),
-      config.REDIS_COMMAND_TIMEOUT_MS,
-      'Redis startup GET'
-    );
+    await redisCommand('Redis startup SET', () => redis.set(key, value, 'PX', 10_000));
+    const stored = await redisCommand('Redis startup GET', () => redis.get(key));
     if (stored !== value) throw new Error('Redis startup SET/GET validation returned a mismatch');
   } finally {
-    await withTimeout(
-      redis.del(key),
-      config.REDIS_COMMAND_TIMEOUT_MS,
-      'Redis startup cleanup'
-    ).catch(() => undefined);
+    await redisCommand('Redis startup cleanup', () => redis.del(key)).catch(() => undefined);
   }
   console.info(
     JSON.stringify({
@@ -384,11 +450,16 @@ export async function buildApp() {
   await app.register(helmet);
   await app.register(cookie);
   app.addHook('onRequest', (request, _reply, done) => {
-    if (request.method === 'POST' && request.url.startsWith('/api/v1/auth/login')) {
-      request.loginReceivedAt = performance.now();
-      request.log.info({ event: 'auth.login.request_received' }, 'auth.login.request_received');
+    try {
+      if (request.url.startsWith('/api/')) requireRedisReady();
+      if (request.method === 'POST' && request.url.startsWith('/api/v1/auth/login')) {
+        request.loginReceivedAt = performance.now();
+        request.log.info({ event: 'auth.login.request_received' }, 'auth.login.request_received');
+      }
+      done();
+    } catch (error) {
+      done(error as Error);
     }
-    done();
   });
   await app.register(rateLimit, { max: 120, timeWindow: '1 minute', redis });
 
@@ -406,8 +477,8 @@ export async function buildApp() {
     });
   });
 
-  app.get('/health/live', () => ({ status: 'ok' }));
-  app.get('/health/ready', async (_request, reply) => {
+  app.get('/health/live', { config: { rateLimit: false } }, () => ({ status: 'ok' }));
+  app.get('/health/ready', { config: { rateLimit: false } }, async (_request, reply) => {
     try {
       await Promise.all([
         withTimeout(
@@ -415,7 +486,7 @@ export async function buildApp() {
           config.DATABASE_OPERATION_TIMEOUT_MS,
           'MariaDB readiness check'
         ),
-        withTimeout(redis.ping(), config.REDIS_COMMAND_TIMEOUT_MS, 'Redis readiness check')
+        redisCommand('Redis readiness check', () => redis.ping())
       ]);
       return { status: 'ready' };
     } catch {
@@ -487,26 +558,26 @@ export async function buildApp() {
         throw new HttpError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
       }
       const sessionStartedAt = performance.now();
-      request.log.info({ event: 'auth.login.session_create' }, 'auth.login.session_create.start');
+      request.log.info({ event: 'session.create' }, 'session.create.start');
       const token = createSessionToken();
-      request.log.info(
-        {
-          event: 'auth.login.session_create',
-          durationMs: Math.round(performance.now() - sessionStartedAt)
-        },
-        'auth.login.session_create.complete'
-      );
       await loginStage(
         request,
-        'auth.login.redis_connection',
-        () => redis.ping(),
+        'session.redis.ping',
+        () => redisCommand('Redis login PING', () => redis.ping()),
         loginStageTimeout(config.REDIS_COMMAND_TIMEOUT_MS)
       );
       await loginStage(
         request,
-        'auth.login.redis_write',
+        'session.redis.set',
         () => writeSession(token, user),
         loginStageTimeout(config.REDIS_COMMAND_TIMEOUT_MS)
+      );
+      request.log.info(
+        {
+          event: 'session.create',
+          durationMs: Math.round(performance.now() - sessionStartedAt)
+        },
+        'session.create.complete'
       );
       try {
         await loginStage(
@@ -525,11 +596,9 @@ export async function buildApp() {
           loginStageTimeout(config.DATABASE_OPERATION_TIMEOUT_MS)
         );
       } catch (error) {
-        await withTimeout(
-          redis.del(sessionKey(token)),
-          config.REDIS_COMMAND_TIMEOUT_MS,
-          'Redis failed-login cleanup'
-        ).catch(() => undefined);
+        await redisCommand('Redis failed-login cleanup', () => redis.del(sessionKey(token))).catch(
+          () => undefined
+        );
         throw error;
       }
       const cookieStartedAt = performance.now();
@@ -579,7 +648,11 @@ export async function buildApp() {
       });
 
       v1.post('/auth/logout', async (request, reply) => {
-        if (request.sessionToken) await redis.del(sessionKey(request.sessionToken));
+        if (request.sessionToken) {
+          await redisCommand('Redis logout session deletion', () =>
+            redis.del(sessionKey(request.sessionToken as string))
+          );
+        }
         reply.clearCookie(config.COOKIE_NAME, {
           path: '/',
           ...(config.COOKIE_DOMAIN ? { domain: config.COOKIE_DOMAIN } : {})
@@ -643,7 +716,11 @@ export async function buildApp() {
             where: { id: actor.id },
             data: { passwordHash, mustChangePassword: false, sessionVersion: { increment: 1 } }
           });
-          if (request.sessionToken) await redis.del(sessionKey(request.sessionToken));
+          if (request.sessionToken) {
+            await redisCommand('Redis password-change session deletion', () =>
+              redis.del(sessionKey(request.sessionToken as string))
+            );
+          }
           reply.clearCookie(config.COOKIE_NAME, { path: '/' });
           return reply.status(204).send();
         }
@@ -671,7 +748,9 @@ export async function buildApp() {
         const credential = await prisma.providerCredential.create({
           data: { connectionId: connection.id, status: 'STAGED', ...encrypted }
         });
-        await redis.del(dashboardCacheKey(actor.id));
+        await redisCommand('Redis dashboard invalidation', () =>
+          redis.del(dashboardCacheKey(actor.id))
+        );
         const job = await queueConnectionOperation(
           actor.id,
           connection.id,
@@ -719,7 +798,9 @@ export async function buildApp() {
           where: { id, userId: actor.id }
         });
         if (!result.count) throw new HttpError(404, 'NOT_FOUND', 'Connection not found');
-        await redis.del(dashboardCacheKey(actor.id));
+        await redisCommand('Redis dashboard invalidation', () =>
+          redis.del(dashboardCacheKey(actor.id))
+        );
         await prisma.auditEvent.create({
           data: {
             userId: actor.id,
@@ -841,7 +922,9 @@ export async function buildApp() {
           update: { enabled: input.enabled },
           create: { recordId: id, userId: actor.id, enabled: input.enabled }
         });
-        await redis.del(dashboardCacheKey(actor.id));
+        await redisCommand('Redis dashboard invalidation', () =>
+          redis.del(dashboardCacheKey(actor.id))
+        );
         return { selection };
       });
       v1.get('/activity', async (request) => {
@@ -862,7 +945,9 @@ export async function buildApp() {
       const dashboardHandler = async (request: FastifyRequest) => {
         const actor = currentUser(request);
         const cacheKey = dashboardCacheKey(actor.id);
-        const cached = await redis.get(cacheKey);
+        const cached = await redisCommand('Redis dashboard cache lookup', () =>
+          redis.get(cacheKey)
+        );
         if (cached) return JSON.parse(cached) as unknown;
         const [
           connections,
@@ -912,7 +997,9 @@ export async function buildApp() {
           counts: { connections, accounts, zones, records, selectedRecords },
           recentActivity
         };
-        await redis.set(cacheKey, JSON.stringify(dashboard), 'EX', 30);
+        await redisCommand('Redis dashboard cache write', () =>
+          redis.set(cacheKey, JSON.stringify(dashboard), 'EX', 30)
+        );
         return dashboard;
       };
       v1.get('/dashboard', dashboardHandler);
@@ -966,7 +1053,14 @@ async function start(): Promise<void> {
 
 if (process.env.NODE_ENV !== 'test') {
   start().catch((error: unknown) => {
-    console.error(error instanceof Error ? error.message : 'API startup failed');
-    process.exitCode = 1;
+    console.error(
+      JSON.stringify({
+        event: 'api.startup.failed',
+        message: error instanceof Error ? error.message : 'API startup failed'
+      })
+    );
+    redis.disconnect(false);
+    queueRedis.disconnect(false);
+    process.exit(1);
   });
 }

@@ -46,6 +46,13 @@ authentication smoke test inside the API container:
 docker compose exec api node /app/smoke-auth.mjs
 ```
 
+To exercise migrations, bootstrap, MariaDB, Redis, login, cookies, session restoration, and
+readiness without touching production data:
+
+```sh
+sh scripts/smoke-redis-outage.sh
+```
+
 See [Synology deployment](docs/synology.md) for MariaDB permissions, Container Manager instructions, startup behavior, backups, and troubleshooting.
 
 ## Local development

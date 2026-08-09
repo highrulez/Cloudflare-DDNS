@@ -79,12 +79,14 @@ Startup order is automatic:
 2. Redis becomes healthy.
 3. The API receives the real `DATABASE_URL` from `.env` at runtime and waits for MariaDB connectivity.
 4. Prisma applies pending migrations to `infrahub`.
-5. The API creates the configured administrator only when no administrator exists. On later
+5. The API validates `REDIS_URL`, waits for its request and queue clients to reach `ready`, then
+   performs authenticated `PING` and temporary `SET`/`GET` checks. Any failure stops startup.
+6. The API creates the configured administrator only when no administrator exists. On later
    starts, `ADMIN_EMAIL` must match the existing administrator. While the bootstrap password
    change is still required, `ADMIN_PASSWORD` must also match the stored hash.
-6. The API becomes healthy.
-7. The worker starts its prebuilt Node artifact and reports healthy after its BullMQ consumers and scheduler initialize.
-8. The web dashboard starts after API health succeeds.
+7. Fastify begins accepting requests and the API becomes healthy.
+8. The worker starts its prebuilt Node artifact and reports healthy after its BullMQ consumers and scheduler initialize.
+9. The web dashboard starts after API health succeeds.
 
 The runtime images contain the generated Prisma Client, Prisma CLI, migrations, and compiled API/worker artifacts. They run as the unprivileged `node` user with `/app` read-only. Only `/tmp` and `/home/node` are writable temporary filesystems.
 

@@ -92,9 +92,25 @@ const booleanEnv = z
   .default('false')
   .transform((value) => value === 'true');
 
+const redisUrlSchema = z
+  .string()
+  .url()
+  .superRefine((value, context) => {
+    const url = new URL(value);
+    if (!['redis:', 'rediss:'].includes(url.protocol)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'REDIS_URL must use the redis or rediss protocol'
+      });
+    }
+    if (!url.hostname) {
+      context.addIssue({ code: 'custom', message: 'REDIS_URL must include a hostname' });
+    }
+  });
+
 const runtimeConfigShape = {
   DATABASE_URL: z.string().min(1),
-  REDIS_URL: z.string().url(),
+  REDIS_URL: redisUrlSchema,
   APP_ENCRYPTION_KEY: z.string().transform((value, context) => {
     const key = Buffer.from(value, 'base64');
     if (key.length !== 32 || key.toString('base64') !== value) {

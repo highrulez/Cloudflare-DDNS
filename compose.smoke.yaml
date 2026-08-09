@@ -11,13 +11,7 @@ services:
     tmpfs:
       - /var/lib/mysql
     healthcheck:
-      test:
-        [
-          'CMD',
-          'healthcheck.sh',
-          '--connect',
-          '--innodb_initialized'
-        ]
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
       interval: 3s
       timeout: 3s
       retries: 30

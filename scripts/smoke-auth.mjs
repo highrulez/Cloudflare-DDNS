@@ -6,6 +6,7 @@ const origin =
   process.env.ALLOWED_ORIGINS?.split(',')[0]?.trim() ??
   new URL(baseUrl).origin;
 const requestTimeoutMs = Number(process.env.AUTH_SMOKE_TIMEOUT_MS ?? 30_000);
+const expectRedisFailure = process.env.AUTH_SMOKE_EXPECT_REDIS_FAILURE === 'true';
 
 if (!email || !password) {
   throw new Error(
@@ -26,14 +27,31 @@ async function checkedFetch(path, init = {}) {
 }
 
 const startedAt = performance.now();
-const login = await checkedFetch('/api/v1/auth/login', {
+const login = await fetch(`${baseUrl}/api/v1/auth/login`, {
   method: 'POST',
   headers: {
     'content-type': 'application/json',
     origin
   },
-  body: JSON.stringify({ email, password })
+  body: JSON.stringify({ email, password }),
+  signal: AbortSignal.timeout(requestTimeoutMs)
 });
+
+if (expectRedisFailure) {
+  if (![500, 503].includes(login.status)) {
+    const body = await login.text();
+    throw new Error(`Login returned ${login.status} instead of a controlled 500/503: ${body}`);
+  }
+  console.log(
+    `Redis outage smoke test passed in ${Math.round(performance.now() - startedAt)}ms: login failed quickly with ${login.status}`
+  );
+  process.exit(0);
+}
+
+if (!login.ok) {
+  const body = await login.text();
+  throw new Error(`POST /api/v1/auth/login returned ${login.status}: ${body}`);
+}
 const setCookie = login.headers.get('set-cookie');
 if (!setCookie) throw new Error('Login succeeded without a Set-Cookie header');
 const sessionCookie = setCookie.split(';', 1)[0];
