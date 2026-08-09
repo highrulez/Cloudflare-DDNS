@@ -2,10 +2,6 @@ ALTER TABLE `CloudflareZone`
   ADD COLUMN `recordCount` INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN `lastSyncedAt` DATETIME(3) NULL;
 
-ALTER TABLE `IpDetectionRun`
-  ADD COLUMN `ipv4Status` VARCHAR(32) NULL,
-  ADD COLUMN `ipv6Status` VARCHAR(32) NULL;
-
 ALTER TABLE `DdnsUpdateLog`
   MODIFY `action` ENUM(
     'CHECKED',

@@ -1,0 +1,3 @@
+ALTER TABLE `IpDetectionRun`
+  ADD COLUMN `ipv4Status` VARCHAR(32) NULL,
+  ADD COLUMN `ipv6Status` VARCHAR(32) NULL;

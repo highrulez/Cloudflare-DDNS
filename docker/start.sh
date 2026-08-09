@@ -20,4 +20,6 @@ done
 node /app/database/node_modules/prisma/build/index.js migrate deploy \
   --config /app/database/prisma.config.ts
 
+node /app/dist/schema-check.js
+
 exec node /app/dist/server.js

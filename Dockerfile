@@ -44,7 +44,8 @@ COPY --from=build /output/database/scripts ./database/scripts
 COPY --from=build /output/database/node_modules ./database/node_modules
 COPY --chmod=755 docker/start.sh /usr/local/bin/start-cloudflare-ddns
 
-RUN node -e "['fastify','@fastify/cookie','@fastify/helmet','@fastify/static','argon2','mariadb','@prisma/adapter-mariadb','@prisma/client','zod','dotenv'].forEach(require.resolve); console.log('Runtime dependencies OK')"
+RUN test -f /app/dist/schema-check.js \
+    && node -e "['fastify','@fastify/cookie','@fastify/helmet','@fastify/static','argon2','mariadb','@prisma/adapter-mariadb','@prisma/client','zod','dotenv'].forEach(require.resolve); console.log('Runtime dependencies OK')"
 
 USER node
 EXPOSE 8090
