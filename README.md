@@ -20,9 +20,10 @@ and records every result in MariaDB.
 ## Requirements
 
 - Synology DSM Container Manager or Docker Engine with Compose v2
+- An existing Synology MariaDB 10 database and non-root application user reachable over TCP
 - A Cloudflare API token
 - Port `8090` available, or another value configured with `HOST_PORT`
-- At least 512 MB free memory; 1 GB is recommended for the app and MariaDB
+- At least 512 MB free memory for the application container
 
 ## Quick start
 
@@ -33,14 +34,17 @@ and records every result in MariaDB.
    cp .env.example .env
    ```
 
-3. Set unique database passwords, `APP_ORIGIN`, `ENCRYPTION_KEY`, and `SESSION_SECRET`.
+3. Set `DATABASE_URL` for the existing Synology MariaDB database, plus `APP_ORIGIN`,
+   `ENCRYPTION_KEY`, and `SESSION_SECRET`.
 
    ```sh
    node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
    node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
    ```
 
-4. If the database password contains reserved URL characters, URL-encode it in `DATABASE_URL`.
+4. Use the NAS LAN address in `DATABASE_URL`, not `localhost` or `db`. Synology MariaDB 10 commonly
+   listens on port `3307`; confirm its configured TCP port. URL-encode reserved characters in the
+   database password.
 5. Build and start:
 
    ```sh
@@ -50,7 +54,8 @@ and records every result in MariaDB.
 
 6. Open `http://SYNOLOGY-IP:8090` and complete the setup wizard.
 
-The database is internal-only and is not published on a host port.
+Compose starts only the application container. It does not install, create, initialize, start,
+stop, or back up MariaDB.
 
 ## Environment variables
 
@@ -59,8 +64,8 @@ Important values:
 - `HOST_PORT`: host-facing port, default `8090`
 - `APP_PORT`: container port, default `3000`
 - `APP_ORIGIN`: exact browser origin, such as `http://192.168.1.10:8090`
-- `DATABASE_URL`: application MariaDB URL using hostname `db`
-- `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_ROOT_PASSWORD`: MariaDB initialization
+- `DATABASE_URL`: complete URL for the existing Synology MariaDB database, such as
+  `mysql://cloudflare_ddns:encoded-password@192.168.1.10:3307/cloudflare_ddns`
 - `ENCRYPTION_KEY`: canonical base64 for exactly 32 random bytes; encrypts API tokens
 - `SESSION_SECRET`: at least 32 random characters; protects opaque session-token hashes
 - `COOKIE_SECURE`: set `true` when the dashboard is served over HTTPS
@@ -122,7 +127,7 @@ without secrets. Docker uses the same endpoint.
 
 Back up:
 
-- The Compose volume `cloudflare-ddns-manager_mariadb-data`
+- The existing MariaDB database using your normal Synology database backup procedure
 - `.env`, especially `ENCRYPTION_KEY` and `SESSION_SECRET`
 
 Protect backups as secrets. A database dump without `ENCRYPTION_KEY` cannot decrypt API tokens.
@@ -137,18 +142,21 @@ docker compose up -d
 docker compose logs -f app
 ```
 
-The application waits for MariaDB and applies committed Prisma migrations before startup.
+The application waits for the existing MariaDB service and applies its committed application-table
+migrations before startup. It never creates a MariaDB server, database, or database user.
 
 ## Troubleshooting
 
 - **Port unavailable:** change `HOST_PORT`; do not change `APP_PORT` unless necessary.
 - **Origin rejected:** make `APP_ORIGIN` exactly match the browser scheme, host, and port.
-- **Database access denied:** verify both MariaDB variables and the URL-encoded `DATABASE_URL`.
+- **Database access denied:** verify the existing database, application user grants, TCP access, and
+  URL-encoded `DATABASE_URL`.
 - **Token rejected:** confirm Bearer token permissions and zone-resource restrictions.
 - **No zones:** the token needs Zone Read access for at least one zone.
 - **Updates forbidden:** the token needs Zone DNS Edit for the selected zone.
 - **IPv6 not detected:** confirm outbound IPv6 from the container, or leave IPv6 disabled.
-- **Container unhealthy:** inspect `docker compose logs app db`.
+- **Container unhealthy:** inspect `docker compose logs app` and verify native MariaDB is reachable
+  from containers.
 
 ## Development
 

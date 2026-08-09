@@ -25,9 +25,6 @@ services:
       HTTP_TIMEOUT_MS: ${HTTP_TIMEOUT_MS:-10000}
     ports:
       - '${HOST_PORT:-8090}:${APP_PORT:-3000}'
-    depends_on:
-      db:
-        condition: service_healthy
     restart: unless-stopped
     init: true
     read_only: true
@@ -48,33 +45,3 @@ services:
       timeout: 5s
       retries: 8
       start_period: 45s
-    networks:
-      - app
-
-  db:
-    image: mariadb:10.11
-    environment:
-      MARIADB_DATABASE: ${DB_NAME:-cloudflare_ddns}
-      MARIADB_USER: ${DB_USER:-cloudflare_ddns}
-      MARIADB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}
-      TZ: ${TZ:-Asia/Kuala_Lumpur}
-    volumes:
-      - mariadb-data:/var/lib/mysql
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    healthcheck:
-      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
-    networks:
-      - app
-
-volumes:
-  mariadb-data:
-
-networks:
-  app:
