@@ -461,7 +461,10 @@ export async function buildApp() {
       done(error as Error);
     }
   });
-  await app.register(rateLimit, { max: 120, timeWindow: '1 minute', redis });
+  // This deployment runs one API replica, so the in-memory limiter is sufficient.
+  // Keeping rate limiting off Redis ensures every authentication Redis command
+  // passes through the readiness gate and finite command timeout below.
+  await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
 
   app.setErrorHandler((error, request, reply) => {
     const httpError = error instanceof HttpError ? error : undefined;

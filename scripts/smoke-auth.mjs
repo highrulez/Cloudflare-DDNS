@@ -27,15 +27,26 @@ async function checkedFetch(path, init = {}) {
 }
 
 const startedAt = performance.now();
-const login = await fetch(`${baseUrl}/api/v1/auth/login`, {
-  method: 'POST',
-  headers: {
-    'content-type': 'application/json',
-    origin
-  },
-  body: JSON.stringify({ email, password }),
-  signal: AbortSignal.timeout(requestTimeoutMs)
-});
+let login;
+try {
+  login = await fetch(`${baseUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      origin
+    },
+    body: JSON.stringify({ email, password }),
+    signal: AbortSignal.timeout(requestTimeoutMs)
+  });
+} catch (error) {
+  if (error instanceof DOMException && error.name === 'TimeoutError') {
+    throw new Error(
+      `POST /api/v1/auth/login exceeded the ${requestTimeoutMs}ms smoke-test deadline`,
+      { cause: error }
+    );
+  }
+  throw error;
+}
 
 if (expectRedisFailure) {
   if (![500, 503].includes(login.status)) {
