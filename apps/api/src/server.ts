@@ -1,7 +1,6 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import helmet from '@fastify/helmet';
 import cookie from '@fastify/cookie';
-import rateLimit from '@fastify/rate-limit';
 import { hash, verify, needsRehash, argon2id } from 'argon2';
 import { createHash, randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -85,6 +84,10 @@ const systemQueue = new Queue(QUEUES.system, { connection: queueRedis });
 const providers = createProviderRegistry(config.CLOUDFLARE_API_BASE);
 const SESSION_PREFIX = 'infra-hub:session:';
 const DASHBOARD_CACHE_PREFIX = 'infra-hub:dashboard:';
+const GLOBAL_RATE_LIMIT = { max: 120, windowMs: 60_000 } as const;
+const LOGIN_RATE_LIMIT = { max: 5, windowMs: 60_000 } as const;
+const globalRateLimits = new Map<string, { count: number; resetAt: number }>();
+const loginRateLimits = new Map<string, { count: number; resetAt: number }>();
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -276,6 +279,28 @@ function requireOrigin(request: FastifyRequest): void {
   }
 }
 
+function enforceRateLimit(
+  store: Map<string, { count: number; resetAt: number }>,
+  key: string,
+  max: number,
+  windowMs: number
+): void {
+  const now = Date.now();
+  const current = store.get(key);
+  if (!current || current.resetAt <= now) {
+    store.set(key, { count: 1, resetAt: now + windowMs });
+    return;
+  }
+  if (current.count >= max) {
+    throw new HttpError(429, 'RATE_LIMITED', 'Too many requests');
+  }
+  current.count += 1;
+}
+
+function requireLoginRateLimit(request: FastifyRequest): void {
+  enforceRateLimit(loginRateLimits, request.ip, LOGIN_RATE_LIMIT.max, LOGIN_RATE_LIMIT.windowMs);
+}
+
 async function bootstrapAdmin(): Promise<void> {
   const startedAt = performance.now();
   const configuredUser = await withTimeout(
@@ -451,20 +476,24 @@ export async function buildApp() {
   await app.register(cookie);
   app.addHook('onRequest', (request, _reply, done) => {
     try {
-      if (request.url.startsWith('/api/')) requireRedisReady();
-      if (request.method === 'POST' && request.url.startsWith('/api/v1/auth/login')) {
-        request.loginReceivedAt = performance.now();
-        request.log.info({ event: 'auth.login.request_received' }, 'auth.login.request_received');
+      if (request.url.startsWith('/api/')) {
+        requireRedisReady();
+        enforceRateLimit(
+          globalRateLimits,
+          request.ip,
+          GLOBAL_RATE_LIMIT.max,
+          GLOBAL_RATE_LIMIT.windowMs
+        );
+        if (request.method === 'POST' && request.url.startsWith('/api/v1/auth/login')) {
+          request.loginReceivedAt = performance.now();
+          request.log.info({ event: 'auth.login.request_received' }, 'auth.login.request_received');
+        }
       }
       done();
     } catch (error) {
       done(error as Error);
     }
   });
-  // This deployment runs one API replica, so the in-memory limiter is sufficient.
-  // Keeping rate limiting off Redis ensures every authentication Redis command
-  // passes through the readiness gate and finite command timeout below.
-  await app.register(rateLimit, { max: 120, timeWindow: '1 minute' });
 
   app.setErrorHandler((error, request, reply) => {
     const httpError = error instanceof HttpError ? error : undefined;
@@ -480,8 +509,8 @@ export async function buildApp() {
     });
   });
 
-  app.get('/health/live', { config: { rateLimit: false } }, () => ({ status: 'ok' }));
-  app.get('/health/ready', { config: { rateLimit: false } }, async (_request, reply) => {
+  app.get('/health/live', () => ({ status: 'ok' }));
+  app.get('/health/ready', async (_request, reply) => {
     try {
       await Promise.all([
         withTimeout(
@@ -500,8 +529,10 @@ export async function buildApp() {
   app.post(
     '/api/v1/auth/login',
     {
-      config: { rateLimit: { max: 5, timeWindow: '1 minute' } },
-      preHandler: requireOrigin
+      preHandler: (request) => {
+        requireOrigin(request);
+        requireLoginRateLimit(request);
+      }
     },
     async (request, reply) => {
       const loginStartedAt = performance.now();
@@ -700,7 +731,7 @@ export async function buildApp() {
       v1.post(
         '/auth/change-password',
         {
-          config: { rateLimit: { max: 5, timeWindow: '10 minutes' } }
+          preHandler: (request) => enforceRateLimit(loginRateLimits, request.ip, 5, 10 * 60_000)
         },
         async (request, reply) => {
           const input = parse(changePasswordSchema, request.body);
