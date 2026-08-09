@@ -180,21 +180,58 @@ async function loginStage<T>(
   request: FastifyRequest,
   event: string,
   operation: () => Promise<T>,
-  timeoutMs?: number
+  timeoutMs: number
 ): Promise<T> {
   const startedAt = performance.now();
-  request.log.info({ event }, `${event}.start`);
+  request.log.info({ event: `${event}.start`, elapsedMs: 0 }, `${event}.start`);
   try {
-    const result = await (timeoutMs ? withTimeout(operation(), timeoutMs, event) : operation());
+    const result = await withTimeout(operation(), timeoutMs, event);
     request.log.info(
-      { event, durationMs: Math.round(performance.now() - startedAt) },
+      {
+        event: `${event}.complete`,
+        elapsedMs: Math.round(performance.now() - startedAt)
+      },
       `${event}.complete`
     );
     return result;
   } catch (error) {
     request.log.error(
-      { event, durationMs: Math.round(performance.now() - startedAt), err: error },
-      `${event}.failed`
+      {
+        event: `${event}.error`,
+        elapsedMs: Math.round(performance.now() - startedAt),
+        errorName: error instanceof Error ? error.name : 'UnknownError',
+        errorCode:
+          typeof error === 'object' && error && 'code' in error
+            ? String(error.code)
+            : undefined
+      },
+      `${event}.error`
+    );
+    throw error;
+  }
+}
+
+function loginSyncStage<T>(request: FastifyRequest, event: string, operation: () => T): T {
+  const startedAt = performance.now();
+  request.log.info({ event: `${event}.start`, elapsedMs: 0 }, `${event}.start`);
+  try {
+    const result = operation();
+    request.log.info(
+      {
+        event: `${event}.complete`,
+        elapsedMs: Math.round(performance.now() - startedAt)
+      },
+      `${event}.complete`
+    );
+    return result;
+  } catch (error) {
+    request.log.error(
+      {
+        event: `${event}.error`,
+        elapsedMs: Math.round(performance.now() - startedAt),
+        errorName: error instanceof Error ? error.name : 'UnknownError'
+      },
+      `${event}.error`
     );
     throw error;
   }
@@ -549,36 +586,22 @@ export async function buildApp() {
       };
       request.log.info(
         {
-          event: 'auth.login',
+          event: 'auth.login.start',
+          elapsedMs: 0,
           preHandlerDurationMs: request.loginReceivedAt
             ? Math.round(loginStartedAt - request.loginReceivedAt)
             : undefined
         },
         'auth.login.start'
       );
-      const validationStartedAt = performance.now();
-      request.log.info({ event: 'auth.login.validation' }, 'auth.login.validation.start');
-      const input = parse(loginSchema, request.body);
-      request.log.info(
-        {
-          event: 'auth.login.validation',
-          durationMs: Math.round(performance.now() - validationStartedAt)
-        },
-        'auth.login.validation.complete'
+      const input = loginSyncStage(request, 'auth.login.validation', () =>
+        parse(loginSchema, request.body)
       );
       const user = await loginStage(
         request,
         'auth.login.user_lookup',
         () => prisma.user.findUnique({ where: { email: input.email.toLowerCase() } }),
         loginStageTimeout(config.DATABASE_OPERATION_TIMEOUT_MS)
-      );
-      request.log.info(
-        { event: 'auth.login.password_hash_lookup' },
-        'auth.login.password_hash_lookup.start'
-      );
-      request.log.info(
-        { event: 'auth.login.password_hash_lookup', found: Boolean(user?.passwordHash) },
-        'auth.login.password_hash_lookup.complete'
       );
       const passwordValid =
         user &&
@@ -591,32 +614,28 @@ export async function buildApp() {
       if (!user || !passwordValid) {
         throw new HttpError(401, 'INVALID_CREDENTIALS', 'Email or password is incorrect');
       }
-      const sessionStartedAt = performance.now();
-      request.log.info({ event: 'session.create' }, 'session.create.start');
-      const token = createSessionToken();
       await loginStage(
         request,
-        'session.redis.ping',
-        () => redisCommand('Redis login PING', () => redis.ping()),
+        'auth.login.redis_ready_check',
+        async () => {
+          await waitForRedisReady(redis, 'request');
+          await redisCommand('Redis login readiness PING', () => redis.ping());
+        },
         loginStageTimeout(config.REDIS_COMMAND_TIMEOUT_MS)
       );
+      const token = loginSyncStage(request, 'auth.login.session_create', createSessionToken);
       await loginStage(
         request,
-        'session.redis.set',
+        'auth.login.redis_set',
         () => writeSession(token, user),
         loginStageTimeout(config.REDIS_COMMAND_TIMEOUT_MS)
       );
-      request.log.info(
-        {
-          event: 'session.create',
-          durationMs: Math.round(performance.now() - sessionStartedAt)
-        },
-        'session.create.complete'
-      );
+      // Sessions are intentionally stored only in Redis; no database session row exists.
+      loginSyncStage(request, 'auth.login.database_session_write', () => undefined);
       try {
         await loginStage(
           request,
-          'auth.login.audit',
+          'auth.login.audit_write',
           () =>
             prisma.auditEvent.create({
               data: {
@@ -635,15 +654,8 @@ export async function buildApp() {
         );
         throw error;
       }
-      const cookieStartedAt = performance.now();
-      request.log.info({ event: 'auth.login.cookie' }, 'auth.login.cookie.start');
-      reply.setCookie(config.COOKIE_NAME, token, cookieOptions());
-      request.log.info(
-        {
-          event: 'auth.login.cookie',
-          durationMs: Math.round(performance.now() - cookieStartedAt)
-        },
-        'auth.login.cookie.complete'
+      loginSyncStage(request, 'auth.login.cookie', () =>
+        reply.setCookie(config.COOKIE_NAME, token, cookieOptions())
       );
       const response = {
         user: {
@@ -653,14 +665,9 @@ export async function buildApp() {
           mustChangePassword: user.mustChangePassword
         }
       };
-      request.log.info(
-        {
-          event: 'auth.login.response',
-          durationMs: Math.round(performance.now() - loginStartedAt)
-        },
-        'auth.login.response'
+      return loginSyncStage(request, 'auth.login.response', () =>
+        reply.send(response)
       );
-      return reply.send(response);
     }
   );
 
