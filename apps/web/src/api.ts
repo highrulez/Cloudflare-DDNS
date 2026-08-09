@@ -1,8 +1,12 @@
 export type User = { id: string; username: string };
 export type Status = 'healthy' | 'updating' | 'degraded' | 'disabled' | 'error';
+export type DetectionStatus =
+  'DETECTED' | 'NETWORK_UNAVAILABLE' | 'PROVIDER_FAILED' | 'NO_GLOBAL_ADDRESS' | 'DISABLED';
 export type Dashboard = {
   currentIp?: string;
   currentIpv6?: string;
+  ipv4Status?: DetectionStatus;
+  ipv6Status?: DetectionStatus;
   status: Status;
   lastCheckedAt?: string;
   lastChangedAt?: string;
@@ -30,7 +34,21 @@ export type Zone = {
   managedCount: number;
   lastSyncedAt?: string;
 };
-export type PublicIp = { ipv4: string | null; ipv6: string | null; detectedAt?: string };
+export type PublicIp = {
+  ipv4: string | null;
+  ipv6: string | null;
+  ipv4Status?: DetectionStatus;
+  ipv6Status?: DetectionStatus;
+  detectedAt?: string;
+};
+export function detectionStatusText(status: DetectionStatus | undefined, family: 'IPv4' | 'IPv6') {
+  if (status === 'DETECTED') return `${family} detected`;
+  if (status === 'NETWORK_UNAVAILABLE') return `Container/network ${family} unavailable`;
+  if (status === 'PROVIDER_FAILED') return `${family} provider failed`;
+  if (status === 'NO_GLOBAL_ADDRESS') return `No global ${family} found`;
+  if (status === 'DISABLED') return `${family} detection disabled`;
+  return `${family} not checked`;
+}
 export type DiscoveredRecord = {
   id: string;
   type: 'A' | 'AAAA';
@@ -226,7 +244,13 @@ export const api = {
   logout: () => request<void>('/auth/logout', body('POST')),
   dashboard: async (): Promise<Dashboard> => {
     const result = await request<{
-      currentIp: { ipv4?: string; ipv6?: string; detectedAt?: string };
+      currentIp: {
+        ipv4?: string;
+        ipv6?: string;
+        ipv4Status?: DetectionStatus;
+        ipv6Status?: DetectionStatus;
+        detectedAt?: string;
+      };
       scheduler?: { running?: boolean; nextCheckAt?: string };
       records: { total: number; byHealth: Record<string, number> };
       recentActivity: Array<Record<string, unknown>>;
@@ -236,6 +260,8 @@ export const api = {
     return {
       currentIp: result.currentIp.ipv4,
       currentIpv6: result.currentIp.ipv6,
+      ipv4Status: result.currentIp.ipv4Status,
+      ipv6Status: result.currentIp.ipv6Status,
       status: result.scheduler?.running ? 'updating' : failedRecords ? 'degraded' : 'healthy',
       lastCheckedAt: result.currentIp.detectedAt,
       nextCheckAt: result.scheduler?.nextCheckAt,

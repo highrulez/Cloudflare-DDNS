@@ -5,8 +5,9 @@
 1. Place the repository in a shared folder, for example
    `/volume1/docker/cloudflare-ddns-manager`.
 2. Copy `.env.example` to `.env` and replace every placeholder.
-3. Set `DATABASE_URL` to the existing Synology MariaDB 10 database. Use the NAS LAN address rather
-   than `localhost`; Synology MariaDB 10 commonly uses TCP port `3307`.
+3. Preserve the currently verified `DATABASE_URL` for the existing Synology MariaDB 10 database.
+   Host networking makes `127.0.0.1` refer to the NAS, but changing the address can change which
+   MariaDB user grant applies. Verify before changing it.
 4. In Container Manager, create a Project from the repository directory and select `compose.yaml`.
 5. Build and start the project.
 6. Open `http://NAS-IP:8090`.
@@ -16,6 +17,10 @@ The project creates exactly one container:
 - `app`: React dashboard, Fastify API, DDNS scheduler, and application schema migrations
 
 It does not deploy or manage a MariaDB container, volume, database, or database user.
+
+The application container uses Docker host networking. It shares the Synology network namespace so
+public IPv4 and IPv6 detection represent the NAS itself. Compose does not publish ports or create a
+separate Docker IPv6 subnet; Fastify listens directly on `0.0.0.0:8090`. Port `8080` is not used.
 
 ## Existing MariaDB prerequisites
 
@@ -34,8 +39,18 @@ For example:
 DATABASE_URL=mysql://cloudflare_ddns:encoded-password@192.168.1.10:3307/cloudflare_ddns
 ```
 
-Do not use `127.0.0.1` or `localhost`: inside the container those addresses refer to the application
-container, not the Synology host.
+With host networking, `127.0.0.1` and `localhost` refer to the Synology host. However, keep the
+existing LAN-address URL until all of the following are verified:
+
+- MariaDB accepts TCP connections on loopback.
+- The application user has an applicable MariaDB host grant.
+- The existing URL works from the host-networked application image.
+
+Test the unchanged URL before startup:
+
+```sh
+docker compose run --rm app node /app/database/scripts/check-database.mjs
+```
 
 ## Startup order
 
@@ -63,6 +78,18 @@ docker compose ps
 docker compose logs -f app
 docker compose restart app
 ```
+
+## Verify host-network IPv4 and IPv6
+
+After rebuilding and starting the application, test Node.js from inside the same container:
+
+```sh
+docker compose exec app node -e "fetch('https://api4.ipify.org').then(r=>r.text()).then(v=>console.log('IPv4:',v.trim())).catch(e=>{console.error(e);process.exit(1)})"
+docker compose exec app node -e "fetch('https://api6.ipify.org').then(r=>r.text()).then(v=>console.log('IPv6:',v.trim())).catch(e=>{console.error(e);process.exit(1)})"
+```
+
+Both commands must print the Synology host's public addresses. The IPv6 command must not report
+`EADDRNOTAVAIL` or `ENETUNREACH`.
 
 Stopping or removing this Compose project affects only the application container. Native Synology
 MariaDB continues running.

@@ -198,6 +198,8 @@ export const IpDetectionRunScalarFieldEnum = {
   finishedAt: 'finishedAt',
   ipv4: 'ipv4',
   ipv6: 'ipv6',
+  ipv4Status: 'ipv4Status',
+  ipv6Status: 'ipv6Status',
   success: 'success'
 } as const
 
@@ -386,7 +388,9 @@ export const IpDetectionRunOrderByRelevanceFieldEnum = {
   id: 'id',
   ddnsRunId: 'ddnsRunId',
   ipv4: 'ipv4',
-  ipv6: 'ipv6'
+  ipv6: 'ipv6',
+  ipv4Status: 'ipv4Status',
+  ipv6Status: 'ipv6Status'
 } as const
 
 export type IpDetectionRunOrderByRelevanceFieldEnum = (typeof IpDetectionRunOrderByRelevanceFieldEnum)[keyof typeof IpDetectionRunOrderByRelevanceFieldEnum]

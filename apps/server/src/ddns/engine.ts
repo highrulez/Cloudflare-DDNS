@@ -49,6 +49,10 @@ export class DdnsEngine {
         ...(settings.ipv6Enabled ? (['IPV6'] as const) : [])
       ];
       const detected = new Map<AddressFamily, string>();
+      const detectionStatuses = new Map<AddressFamily, string>([
+        ['IPV4', settings.ipv4Enabled ? 'PROVIDER_FAILED' : 'DISABLED'],
+        ['IPV6', settings.ipv6Enabled ? 'PROVIDER_FAILED' : 'DISABLED']
+      ]);
       const detectionRun = await this.db.ipDetectionRun.create({ data: { ddnsRunId: run.id } });
 
       for (const family of enabledFamilies) {
@@ -64,6 +68,7 @@ export class DdnsEngine {
           this.fetcher,
           settings.requestTimeoutMs
         );
+        detectionStatuses.set(family, outcome.status);
         if (outcome.address) detected.set(family, outcome.address);
         await this.db.ipDetectionResult.createMany({
           data: outcome.attempts.map((attempt) => ({
@@ -83,6 +88,8 @@ export class DdnsEngine {
           finishedAt: new Date(),
           ipv4: detected.get('IPV4') ?? null,
           ipv6: detected.get('IPV6') ?? null,
+          ipv4Status: detectionStatuses.get('IPV4') ?? 'PROVIDER_FAILED',
+          ipv6Status: detectionStatuses.get('IPV6') ?? 'PROVIDER_FAILED',
           success: detected.size > 0
         }
       });

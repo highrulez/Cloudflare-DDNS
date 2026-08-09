@@ -7,7 +7,8 @@ services:
       dockerfile: Dockerfile
     environment:
       NODE_ENV: production
-      APP_PORT: ${APP_PORT:-3000}
+      APP_HOST: 0.0.0.0
+      APP_PORT: 8090
       APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env}
       TZ: ${TZ:-Asia/Kuala_Lumpur}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -18,13 +19,12 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-43200}
       CLOUDFLARE_API_BASE: ${CLOUDFLARE_API_BASE:-https://api.cloudflare.com/client/v4}
-      IPV4_PROVIDERS: ${IPV4_PROVIDERS:-https://api.ipify.org,https://checkip.amazonaws.com,https://icanhazip.com}
-      IPV6_PROVIDERS: ${IPV6_PROVIDERS:-https://api6.ipify.org,https://icanhazip.com}
+      IPV4_PROVIDERS: ${IPV4_PROVIDERS:-https://api4.ipify.org,https://checkip.amazonaws.com,https://ipv4.icanhazip.com}
+      IPV6_PROVIDERS: ${IPV6_PROVIDERS:-https://api6.ipify.org,https://ipv6.icanhazip.com,https://v6.ident.me}
       DATABASE_CONNECT_TIMEOUT_MS: ${DATABASE_CONNECT_TIMEOUT_MS:-5000}
       DATABASE_QUERY_TIMEOUT_MS: ${DATABASE_QUERY_TIMEOUT_MS:-10000}
       HTTP_TIMEOUT_MS: ${HTTP_TIMEOUT_MS:-10000}
-    ports:
-      - '${HOST_PORT:-8090}:${APP_PORT:-3000}'
+    network_mode: host
     restart: unless-stopped
     init: true
     read_only: true
@@ -39,7 +39,7 @@ services:
           'CMD',
           'node',
           '-e',
-          "fetch('http://127.0.0.1:'+(process.env.APP_PORT||3000)+'/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+          "fetch('http://127.0.0.1:8090/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
         ]
       interval: 15s
       timeout: 5s

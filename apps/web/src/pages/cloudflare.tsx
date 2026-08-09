@@ -10,7 +10,15 @@ import {
   Trash2
 } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, type Account, type DiscoveredRecord, type Zone, type ZoneDiscovery } from '../api';
+import {
+  api,
+  detectionStatusText,
+  type Account,
+  type DetectionStatus,
+  type DiscoveredRecord,
+  type Zone,
+  type ZoneDiscovery
+} from '../api';
 import { CreateDnsRecordDialog } from '../components/dns';
 import {
   Badge,
@@ -205,8 +213,16 @@ export function CloudflarePage() {
         />
         {discovery && (
           <div className="grid gap-3 sm:grid-cols-2">
-            <IpCard label="Detected IPv4" value={discovery.publicIp.ipv4} />
-            <IpCard label="Detected IPv6" value={discovery.publicIp.ipv6} />
+            <IpCard
+              family="IPv4"
+              value={discovery.publicIp.ipv4}
+              status={discovery.publicIp.ipv4Status}
+            />
+            <IpCard
+              family="IPv6"
+              value={discovery.publicIp.ipv6}
+              status={discovery.publicIp.ipv6Status}
+            />
           </div>
         )}
         {busy === 'zone' ? (
@@ -476,13 +492,19 @@ export function CloudflarePage() {
   );
 }
 
-function IpCard({ label, value }: { label: string; value: string | null }) {
+function IpCard({
+  family,
+  value,
+  status
+}: {
+  family: 'IPv4' | 'IPv6';
+  value: string | null;
+  status?: DetectionStatus;
+}) {
   return (
     <Card className="p-4">
-      <span className="text-xs text-slate-500">{label}</span>
-      <strong className="mt-1 block font-mono">
-        {value ?? (label.includes('IPv6') ? 'IPv6 not available' : 'Not detected')}
-      </strong>
+      <span className="text-xs text-slate-500">{detectionStatusText(status, family)}</span>
+      <strong className="mt-1 block font-mono">{value ?? '—'}</strong>
     </Card>
   );
 }

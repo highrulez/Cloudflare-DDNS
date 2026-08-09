@@ -26,7 +26,7 @@ jobs:
       DATABASE_URL: mysql://cloudflare_ddns:test-password@127.0.0.1:3306/cloudflare_ddns_test
       ENCRYPTION_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       SESSION_SECRET: ci-session-secret-with-at-least-thirty-two-characters
-      APP_ORIGIN: http://127.0.0.1:3000
+      APP_ORIGIN: http://127.0.0.1:8090
       NODE_ENV: test
     steps:
       - uses: actions/checkout@v4

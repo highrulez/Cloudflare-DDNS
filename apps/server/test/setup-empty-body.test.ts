@@ -15,7 +15,7 @@ describe('setup body handling', () => {
     const config: Config = {
       NODE_ENV: 'test',
       APP_HOST: '127.0.0.1',
-      APP_PORT: 3000,
+      APP_PORT: 8090,
       DATABASE_URL: 'mysql://user:password@localhost:3306/ddns',
       SESSION_SECRET: 'a-session-secret-that-is-longer-than-32-characters',
       ENCRYPTION_KEY: Buffer.alloc(32),

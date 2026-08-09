@@ -165,6 +165,8 @@ model IpDetectionRun {
   finishedAt  DateTime?
   ipv4        String?             @db.VarChar(45)
   ipv6        String?             @db.VarChar(45)
+  ipv4Status  String?             @db.VarChar(32)
+  ipv6Status  String?             @db.VarChar(32)
   success     Boolean             @default(false)
   ddnsRun     DdnsRun?            @relation(fields: [ddnsRunId], references: [id], onDelete: SetNull)
   results     IpDetectionResult[]

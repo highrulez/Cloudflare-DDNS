@@ -22,7 +22,7 @@ and records every result in MariaDB.
 - Synology DSM Container Manager or Docker Engine with Compose v2
 - An existing Synology MariaDB 10 database and non-root application user reachable over TCP
 - A Cloudflare API token
-- Port `8090` available, or another value configured with `HOST_PORT`
+- Port `8090` available on the Synology host
 - At least 512 MB free memory for the application container
 
 ## Quick start
@@ -42,9 +42,10 @@ and records every result in MariaDB.
    node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
    ```
 
-4. Use the NAS LAN address in `DATABASE_URL`, not `localhost` or `db`. Synology MariaDB 10 commonly
-   listens on port `3307`; confirm its configured TCP port. URL-encode reserved characters in the
-   database password.
+4. Preserve the verified native MariaDB address in `DATABASE_URL`. Host networking makes
+   `127.0.0.1` refer to the Synology host, but do not change a working LAN-address connection until
+   MariaDB TCP binding and user grants have been verified. Synology MariaDB 10 commonly uses port
+   `3307`. URL-encode reserved characters in the database password.
 5. Build and start:
 
    ```sh
@@ -61,8 +62,8 @@ stop, or back up MariaDB.
 
 Important values:
 
-- `HOST_PORT`: host-facing port, default `8090`
-- `APP_PORT`: container port, default `3000`
+- `APP_HOST`: Fastify bind address, fixed to `0.0.0.0` by Compose
+- `APP_PORT`: Fastify host-network port, fixed to `8090` by Compose
 - `APP_ORIGIN`: exact browser origin, such as `http://192.168.1.10:8090`
 - `DATABASE_URL`: complete URL for the existing Synology MariaDB database, such as
   `mysql://cloudflare_ddns:encoded-password@192.168.1.10:3307/cloudflare_ddns`
@@ -156,14 +157,16 @@ migrations before startup. It never creates a MariaDB server, database, or datab
 
 ## Troubleshooting
 
-- **Port unavailable:** change `HOST_PORT`; do not change `APP_PORT` unless necessary.
+- **Port unavailable:** free TCP port `8090` on the Synology host before startup. Port `8080` is not
+  used.
 - **Origin rejected:** make `APP_ORIGIN` exactly match the browser scheme, host, and port.
 - **Database access denied:** verify the existing database, application user grants, TCP access, and
   URL-encoded `DATABASE_URL`.
 - **Token rejected:** confirm Bearer token permissions and zone-resource restrictions.
 - **No zones:** the token needs Zone Read access for at least one zone.
 - **Updates forbidden:** the token needs Zone DNS Edit for the selected zone.
-- **IPv6 not detected:** confirm outbound IPv6 from the container, or leave IPv6 disabled.
+- **Container/network IPv6 unavailable:** verify the application uses host networking, then run the
+  documented Node IPv6 diagnostic from inside the container.
 - **Container unhealthy:** inspect `docker compose logs app` and verify native MariaDB is reachable
   from containers.
 

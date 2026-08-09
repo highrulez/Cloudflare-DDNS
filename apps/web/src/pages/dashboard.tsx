@@ -1,6 +1,6 @@
 import { Copy, RefreshCw, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { api, type Dashboard } from '../api';
+import { api, detectionStatusText, type Dashboard, type DetectionStatus } from '../api';
 import {
   Badge,
   Button,
@@ -70,8 +70,8 @@ export function DashboardPage() {
         }
       />
       <div className="grid gap-4 lg:grid-cols-2">
-        <IpCard label="Detected IPv4" value={data.currentIp} />
-        <IpCard label="Detected IPv6" value={data.currentIpv6} unavailable="IPv6 not available" />
+        <IpCard family="IPv4" value={data.currentIp} status={data.ipv4Status} />
+        <IpCard family="IPv6" value={data.currentIpv6} status={data.ipv6Status} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
@@ -146,23 +146,23 @@ export function DashboardPage() {
 }
 
 function IpCard({
-  label,
+  family,
   value,
-  unavailable = 'Not detected'
+  status
 }: {
-  label: string;
+  family: 'IPv4' | 'IPv6';
   value?: string;
-  unavailable?: string;
+  status?: DetectionStatus;
 }) {
   return (
     <Card className="bg-gradient-to-br from-slate-950 to-blue-950 p-6 text-white">
-      <span className="text-sm text-blue-200">{label}</span>
+      <span className="text-sm text-blue-200">{detectionStatusText(status, family)}</span>
       <div className="mt-2 flex items-center gap-2">
-        <strong className="break-all font-mono text-2xl">{value ?? unavailable}</strong>
+        <strong className="break-all font-mono text-2xl">{value ?? '—'}</strong>
         {value && (
           <Button
             variant="ghost"
-            aria-label={`Copy ${label}`}
+            aria-label={`Copy ${family}`}
             onClick={() => void navigator.clipboard.writeText(value)}
           >
             <Copy className="h-4 w-4" />

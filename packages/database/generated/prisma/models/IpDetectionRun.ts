@@ -31,6 +31,8 @@ export type IpDetectionRunMinAggregateOutputType = {
   finishedAt: Date | null
   ipv4: string | null
   ipv6: string | null
+  ipv4Status: string | null
+  ipv6Status: string | null
   success: boolean | null
 }
 
@@ -41,6 +43,8 @@ export type IpDetectionRunMaxAggregateOutputType = {
   finishedAt: Date | null
   ipv4: string | null
   ipv6: string | null
+  ipv4Status: string | null
+  ipv6Status: string | null
   success: boolean | null
 }
 
@@ -51,6 +55,8 @@ export type IpDetectionRunCountAggregateOutputType = {
   finishedAt: number
   ipv4: number
   ipv6: number
+  ipv4Status: number
+  ipv6Status: number
   success: number
   _all: number
 }
@@ -63,6 +69,8 @@ export type IpDetectionRunMinAggregateInputType = {
   finishedAt?: true
   ipv4?: true
   ipv6?: true
+  ipv4Status?: true
+  ipv6Status?: true
   success?: true
 }
 
@@ -73,6 +81,8 @@ export type IpDetectionRunMaxAggregateInputType = {
   finishedAt?: true
   ipv4?: true
   ipv6?: true
+  ipv4Status?: true
+  ipv6Status?: true
   success?: true
 }
 
@@ -83,6 +93,8 @@ export type IpDetectionRunCountAggregateInputType = {
   finishedAt?: true
   ipv4?: true
   ipv6?: true
+  ipv4Status?: true
+  ipv6Status?: true
   success?: true
   _all?: true
 }
@@ -166,6 +178,8 @@ export type IpDetectionRunGroupByOutputType = {
   finishedAt: Date | null
   ipv4: string | null
   ipv6: string | null
+  ipv4Status: string | null
+  ipv6Status: string | null
   success: boolean
   _count: IpDetectionRunCountAggregateOutputType | null
   _min: IpDetectionRunMinAggregateOutputType | null
@@ -197,6 +211,8 @@ export type IpDetectionRunWhereInput = {
   finishedAt?: Prisma.DateTimeNullableFilter<"IpDetectionRun"> | Date | string | null
   ipv4?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
   ipv6?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
+  ipv4Status?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
+  ipv6Status?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
   success?: Prisma.BoolFilter<"IpDetectionRun"> | boolean
   ddnsRun?: Prisma.XOR<Prisma.DdnsRunNullableScalarRelationFilter, Prisma.DdnsRunWhereInput> | null
   results?: Prisma.IpDetectionResultListRelationFilter
@@ -209,6 +225,8 @@ export type IpDetectionRunOrderByWithRelationInput = {
   finishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   ipv4?: Prisma.SortOrderInput | Prisma.SortOrder
   ipv6?: Prisma.SortOrderInput | Prisma.SortOrder
+  ipv4Status?: Prisma.SortOrderInput | Prisma.SortOrder
+  ipv6Status?: Prisma.SortOrderInput | Prisma.SortOrder
   success?: Prisma.SortOrder
   ddnsRun?: Prisma.DdnsRunOrderByWithRelationInput
   results?: Prisma.IpDetectionResultOrderByRelationAggregateInput
@@ -225,6 +243,8 @@ export type IpDetectionRunWhereUniqueInput = Prisma.AtLeast<{
   finishedAt?: Prisma.DateTimeNullableFilter<"IpDetectionRun"> | Date | string | null
   ipv4?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
   ipv6?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
+  ipv4Status?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
+  ipv6Status?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
   success?: Prisma.BoolFilter<"IpDetectionRun"> | boolean
   ddnsRun?: Prisma.XOR<Prisma.DdnsRunNullableScalarRelationFilter, Prisma.DdnsRunWhereInput> | null
   results?: Prisma.IpDetectionResultListRelationFilter
@@ -237,6 +257,8 @@ export type IpDetectionRunOrderByWithAggregationInput = {
   finishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   ipv4?: Prisma.SortOrderInput | Prisma.SortOrder
   ipv6?: Prisma.SortOrderInput | Prisma.SortOrder
+  ipv4Status?: Prisma.SortOrderInput | Prisma.SortOrder
+  ipv6Status?: Prisma.SortOrderInput | Prisma.SortOrder
   success?: Prisma.SortOrder
   _count?: Prisma.IpDetectionRunCountOrderByAggregateInput
   _max?: Prisma.IpDetectionRunMaxOrderByAggregateInput
@@ -253,6 +275,8 @@ export type IpDetectionRunScalarWhereWithAggregatesInput = {
   finishedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"IpDetectionRun"> | Date | string | null
   ipv4?: Prisma.StringNullableWithAggregatesFilter<"IpDetectionRun"> | string | null
   ipv6?: Prisma.StringNullableWithAggregatesFilter<"IpDetectionRun"> | string | null
+  ipv4Status?: Prisma.StringNullableWithAggregatesFilter<"IpDetectionRun"> | string | null
+  ipv6Status?: Prisma.StringNullableWithAggregatesFilter<"IpDetectionRun"> | string | null
   success?: Prisma.BoolWithAggregatesFilter<"IpDetectionRun"> | boolean
 }
 
@@ -262,6 +286,8 @@ export type IpDetectionRunCreateInput = {
   finishedAt?: Date | string | null
   ipv4?: string | null
   ipv6?: string | null
+  ipv4Status?: string | null
+  ipv6Status?: string | null
   success?: boolean
   ddnsRun?: Prisma.DdnsRunCreateNestedOneWithoutIpRunsInput
   results?: Prisma.IpDetectionResultCreateNestedManyWithoutRunInput
@@ -274,6 +300,8 @@ export type IpDetectionRunUncheckedCreateInput = {
   finishedAt?: Date | string | null
   ipv4?: string | null
   ipv6?: string | null
+  ipv4Status?: string | null
+  ipv6Status?: string | null
   success?: boolean
   results?: Prisma.IpDetectionResultUncheckedCreateNestedManyWithoutRunInput
 }
@@ -284,6 +312,8 @@ export type IpDetectionRunUpdateInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ipv4?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipv6?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv4Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv6Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   success?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ddnsRun?: Prisma.DdnsRunUpdateOneWithoutIpRunsNestedInput
   results?: Prisma.IpDetectionResultUpdateManyWithoutRunNestedInput
@@ -296,6 +326,8 @@ export type IpDetectionRunUncheckedUpdateInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ipv4?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipv6?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv4Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv6Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   success?: Prisma.BoolFieldUpdateOperationsInput | boolean
   results?: Prisma.IpDetectionResultUncheckedUpdateManyWithoutRunNestedInput
 }
@@ -307,6 +339,8 @@ export type IpDetectionRunCreateManyInput = {
   finishedAt?: Date | string | null
   ipv4?: string | null
   ipv6?: string | null
+  ipv4Status?: string | null
+  ipv6Status?: string | null
   success?: boolean
 }
 
@@ -316,6 +350,8 @@ export type IpDetectionRunUpdateManyMutationInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ipv4?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipv6?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv4Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv6Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   success?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
@@ -326,6 +362,8 @@ export type IpDetectionRunUncheckedUpdateManyInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ipv4?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipv6?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv4Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv6Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   success?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
@@ -342,6 +380,8 @@ export type IpDetectionRunCountOrderByAggregateInput = {
   finishedAt?: Prisma.SortOrder
   ipv4?: Prisma.SortOrder
   ipv6?: Prisma.SortOrder
+  ipv4Status?: Prisma.SortOrder
+  ipv6Status?: Prisma.SortOrder
   success?: Prisma.SortOrder
 }
 
@@ -352,6 +392,8 @@ export type IpDetectionRunMaxOrderByAggregateInput = {
   finishedAt?: Prisma.SortOrder
   ipv4?: Prisma.SortOrder
   ipv6?: Prisma.SortOrder
+  ipv4Status?: Prisma.SortOrder
+  ipv6Status?: Prisma.SortOrder
   success?: Prisma.SortOrder
 }
 
@@ -362,6 +404,8 @@ export type IpDetectionRunMinOrderByAggregateInput = {
   finishedAt?: Prisma.SortOrder
   ipv4?: Prisma.SortOrder
   ipv6?: Prisma.SortOrder
+  ipv4Status?: Prisma.SortOrder
+  ipv6Status?: Prisma.SortOrder
   success?: Prisma.SortOrder
 }
 
@@ -442,6 +486,8 @@ export type IpDetectionRunCreateWithoutResultsInput = {
   finishedAt?: Date | string | null
   ipv4?: string | null
   ipv6?: string | null
+  ipv4Status?: string | null
+  ipv6Status?: string | null
   success?: boolean
   ddnsRun?: Prisma.DdnsRunCreateNestedOneWithoutIpRunsInput
 }
@@ -453,6 +499,8 @@ export type IpDetectionRunUncheckedCreateWithoutResultsInput = {
   finishedAt?: Date | string | null
   ipv4?: string | null
   ipv6?: string | null
+  ipv4Status?: string | null
+  ipv6Status?: string | null
   success?: boolean
 }
 
@@ -478,6 +526,8 @@ export type IpDetectionRunUpdateWithoutResultsInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ipv4?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipv6?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv4Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv6Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   success?: Prisma.BoolFieldUpdateOperationsInput | boolean
   ddnsRun?: Prisma.DdnsRunUpdateOneWithoutIpRunsNestedInput
 }
@@ -489,6 +539,8 @@ export type IpDetectionRunUncheckedUpdateWithoutResultsInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ipv4?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipv6?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv4Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv6Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   success?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
@@ -498,6 +550,8 @@ export type IpDetectionRunCreateWithoutDdnsRunInput = {
   finishedAt?: Date | string | null
   ipv4?: string | null
   ipv6?: string | null
+  ipv4Status?: string | null
+  ipv6Status?: string | null
   success?: boolean
   results?: Prisma.IpDetectionResultCreateNestedManyWithoutRunInput
 }
@@ -508,6 +562,8 @@ export type IpDetectionRunUncheckedCreateWithoutDdnsRunInput = {
   finishedAt?: Date | string | null
   ipv4?: string | null
   ipv6?: string | null
+  ipv4Status?: string | null
+  ipv6Status?: string | null
   success?: boolean
   results?: Prisma.IpDetectionResultUncheckedCreateNestedManyWithoutRunInput
 }
@@ -548,6 +604,8 @@ export type IpDetectionRunScalarWhereInput = {
   finishedAt?: Prisma.DateTimeNullableFilter<"IpDetectionRun"> | Date | string | null
   ipv4?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
   ipv6?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
+  ipv4Status?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
+  ipv6Status?: Prisma.StringNullableFilter<"IpDetectionRun"> | string | null
   success?: Prisma.BoolFilter<"IpDetectionRun"> | boolean
 }
 
@@ -557,6 +615,8 @@ export type IpDetectionRunCreateManyDdnsRunInput = {
   finishedAt?: Date | string | null
   ipv4?: string | null
   ipv6?: string | null
+  ipv4Status?: string | null
+  ipv6Status?: string | null
   success?: boolean
 }
 
@@ -566,6 +626,8 @@ export type IpDetectionRunUpdateWithoutDdnsRunInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ipv4?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipv6?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv4Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv6Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   success?: Prisma.BoolFieldUpdateOperationsInput | boolean
   results?: Prisma.IpDetectionResultUpdateManyWithoutRunNestedInput
 }
@@ -576,6 +638,8 @@ export type IpDetectionRunUncheckedUpdateWithoutDdnsRunInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ipv4?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipv6?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv4Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv6Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   success?: Prisma.BoolFieldUpdateOperationsInput | boolean
   results?: Prisma.IpDetectionResultUncheckedUpdateManyWithoutRunNestedInput
 }
@@ -586,6 +650,8 @@ export type IpDetectionRunUncheckedUpdateManyWithoutDdnsRunInput = {
   finishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   ipv4?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipv6?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv4Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ipv6Status?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   success?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
 
@@ -627,6 +693,8 @@ export type IpDetectionRunSelect<ExtArgs extends runtime.Types.Extensions.Intern
   finishedAt?: boolean
   ipv4?: boolean
   ipv6?: boolean
+  ipv4Status?: boolean
+  ipv6Status?: boolean
   success?: boolean
   ddnsRun?: boolean | Prisma.IpDetectionRun$ddnsRunArgs<ExtArgs>
   results?: boolean | Prisma.IpDetectionRun$resultsArgs<ExtArgs>
@@ -642,10 +710,12 @@ export type IpDetectionRunSelectScalar = {
   finishedAt?: boolean
   ipv4?: boolean
   ipv6?: boolean
+  ipv4Status?: boolean
+  ipv6Status?: boolean
   success?: boolean
 }
 
-export type IpDetectionRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "ddnsRunId" | "startedAt" | "finishedAt" | "ipv4" | "ipv6" | "success", ExtArgs["result"]["ipDetectionRun"]>
+export type IpDetectionRunOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "ddnsRunId" | "startedAt" | "finishedAt" | "ipv4" | "ipv6" | "ipv4Status" | "ipv6Status" | "success", ExtArgs["result"]["ipDetectionRun"]>
 export type IpDetectionRunInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   ddnsRun?: boolean | Prisma.IpDetectionRun$ddnsRunArgs<ExtArgs>
   results?: boolean | Prisma.IpDetectionRun$resultsArgs<ExtArgs>
@@ -665,6 +735,8 @@ export type $IpDetectionRunPayload<ExtArgs extends runtime.Types.Extensions.Inte
     finishedAt: Date | null
     ipv4: string | null
     ipv6: string | null
+    ipv4Status: string | null
+    ipv6Status: string | null
     success: boolean
   }, ExtArgs["result"]["ipDetectionRun"]>
   composites: {}
@@ -1043,6 +1115,8 @@ export interface IpDetectionRunFieldRefs {
   readonly finishedAt: Prisma.FieldRef<"IpDetectionRun", 'DateTime'>
   readonly ipv4: Prisma.FieldRef<"IpDetectionRun", 'String'>
   readonly ipv6: Prisma.FieldRef<"IpDetectionRun", 'String'>
+  readonly ipv4Status: Prisma.FieldRef<"IpDetectionRun", 'String'>
+  readonly ipv6Status: Prisma.FieldRef<"IpDetectionRun", 'String'>
   readonly success: Prisma.FieldRef<"IpDetectionRun", 'Boolean'>
 }
     

@@ -95,9 +95,13 @@ export async function detectCurrentAddresses(db: PrismaClient, config: Config) {
       }))
     )
   });
+  const ipv4Outcome = outcomes.find(({ family }) => family === 'IPV4')?.outcome;
+  const ipv6Outcome = outcomes.find(({ family }) => family === 'IPV6')?.outcome;
   const addresses = {
-    ipv4: outcomes.find(({ family }) => family === 'IPV4')?.outcome.address ?? null,
-    ipv6: outcomes.find(({ family }) => family === 'IPV6')?.outcome.address ?? null
+    ipv4: ipv4Outcome?.address ?? null,
+    ipv6: ipv6Outcome?.address ?? null,
+    ipv4Status: ipv4Outcome?.status ?? 'PROVIDER_FAILED',
+    ipv6Status: ipv6Outcome?.status ?? 'PROVIDER_FAILED'
   };
   await db.ipDetectionRun.update({
     where: { id: run.id },
@@ -105,6 +109,8 @@ export async function detectCurrentAddresses(db: PrismaClient, config: Config) {
       finishedAt: new Date(),
       ipv4: addresses.ipv4,
       ipv6: addresses.ipv6,
+      ipv4Status: addresses.ipv4Status,
+      ipv6Status: addresses.ipv6Status,
       success: Boolean(addresses.ipv4 || addresses.ipv6)
     }
   });

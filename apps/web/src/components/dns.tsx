@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import {
   ApiError,
+  detectionStatusText,
   type Account,
   type CreateDnsRecord,
   type PublicIp,
@@ -209,12 +210,16 @@ export function CreateDnsRecordDialog({
           >
             {type === 'A' && (
               <option value="DETECTED_IPV4">
-                Detected public IPv4 {publicIp?.ipv4 ? `(${publicIp.ipv4})` : '(detect on create)'}
+                {publicIp?.ipv4
+                  ? `Detected public IPv4 (${publicIp.ipv4})`
+                  : detectionStatusText(publicIp?.ipv4Status, 'IPv4')}
               </option>
             )}
             {type === 'AAAA' && (
               <option value="DETECTED_IPV6">
-                Detected public IPv6 {publicIp?.ipv6 ? `(${publicIp.ipv6})` : '(detect on create)'}
+                {publicIp?.ipv6
+                  ? `Detected public IPv6 (${publicIp.ipv6})`
+                  : detectionStatusText(publicIp?.ipv6Status, 'IPv6')}
               </option>
             )}
             <option value="CUSTOM">Custom IP</option>

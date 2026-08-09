@@ -1,7 +1,15 @@
 import { ArrowRight, Plus, RefreshCw, Wifi } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, type Account, type DiscoveredRecord, type PublicIp, type RecordItem } from '../api';
+import {
+  api,
+  detectionStatusText,
+  type Account,
+  type DetectionStatus,
+  type DiscoveredRecord,
+  type PublicIp,
+  type RecordItem
+} from '../api';
 import { CreateDnsRecordDialog } from '../components/dns';
 import { Button, Card, Field, Loading, SelectField, cx } from '../components/ui';
 
@@ -270,8 +278,8 @@ export function SetupWizard() {
                   </SelectField>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <IpCard label="Detected IPv4" value={publicIp?.ipv4} />
-                  <IpCard label="Detected IPv6" value={publicIp?.ipv6} />
+                  <IpCard family="IPv4" value={publicIp?.ipv4} status={publicIp?.ipv4Status} />
+                  <IpCard family="IPv6" value={publicIp?.ipv6} status={publicIp?.ipv6Status} />
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm text-slate-500">
@@ -407,13 +415,19 @@ export function SetupWizard() {
   );
 }
 
-function IpCard({ label, value }: { label: string; value?: string | null }) {
+function IpCard({
+  family,
+  value,
+  status
+}: {
+  family: 'IPv4' | 'IPv6';
+  value?: string | null;
+  status?: DetectionStatus;
+}) {
   return (
     <div className="rounded-xl bg-slate-950 p-4 text-white">
-      <span className="text-xs text-slate-400">{label}</span>
-      <strong className="mt-1 block font-mono">
-        {value ?? (label.includes('IPv6') ? 'IPv6 not available' : 'Not detected')}
-      </strong>
+      <span className="text-xs text-slate-400">{detectionStatusText(status, family)}</span>
+      <strong className="mt-1 block font-mono">{value ?? '—'}</strong>
     </div>
   );
 }
