@@ -4,20 +4,93 @@
 @tailwind utilities;
 
 @layer base {
-  * { @apply border-slate-200; }
-  html { color-scheme: light; }
-  html.dark { color-scheme: dark; }
-  body { @apply m-0 min-w-[320px] bg-slate-50 font-sans antialiased dark:bg-slate-950; }
-  button, input, select { font: inherit; }
-  button { -webkit-tap-highlight-color: transparent; }
-  ::selection { @apply bg-blue-200 text-blue-950 dark:bg-blue-800 dark:text-white; }
+  * {
+    @apply border-slate-200;
+  }
+  html {
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply m-0 min-w-[320px] bg-slate-50 font-sans antialiased dark:bg-slate-950;
+  }
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+  button {
+    -webkit-tap-highlight-color: transparent;
+  }
+  ::selection {
+    @apply bg-blue-200 text-blue-950 dark:bg-blue-800 dark:text-white;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+.login-shell {
+  background:
+    radial-gradient(circle at 18% 22%, rgba(37, 99, 235, 0.12), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(14, 165, 233, 0.08), transparent 28%),
+    linear-gradient(160deg, #050913 0%, #07101d 48%, #050b16 100%);
+}
+
+.login-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(circle at center, black 35%, transparent 85%);
+}
+
+.login-node {
+  animation: login-node-pulse 7s ease-in-out infinite;
+}
+
+.login-node-delay {
+  animation-delay: 2.4s;
+}
+
+.login-radar-sweep {
+  transform-origin: 0 0;
+  animation: login-radar-sweep 18s linear infinite;
+}
+
+@keyframes login-node-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes login-radar-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-node,
+  .login-node-delay,
+  .login-radar-sweep {
+    animation: none !important;
   }
 }

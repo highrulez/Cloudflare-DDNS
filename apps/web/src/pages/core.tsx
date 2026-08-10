@@ -1,14 +1,4 @@
-import {
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Globe2,
-  RefreshCw,
-  Save,
-  ShieldCheck,
-  Wifi,
-  Zap
-} from 'lucide-react';
+import { RefreshCw, Save } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { api, type HistoryItem, type Settings } from '../api';
@@ -26,6 +16,8 @@ import {
   useToast
 } from '../components/ui';
 
+export { LoginPage } from './login';
+
 function useLoad<T>(loader: () => Promise<T>) {
   const [data, setData] = useState<T>();
   const [loading, setLoading] = useState(true);
@@ -40,97 +32,6 @@ function useLoad<T>(loader: () => Promise<T>) {
   }, [loader]);
   useEffect(load, [load]);
   return { data, setData, loading, error, reload: load };
-}
-
-export function LoginPage() {
-  const { user, loading, login } = useAuth();
-  const [show, setShow] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setBusy(true);
-    const form = new FormData(event.currentTarget);
-    try {
-      await login(String(form.get('username') ?? ''), String(form.get('password') ?? ''));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Sign in failed');
-    } finally {
-      setBusy(false);
-    }
-  };
-  if (loading)
-    return (
-      <div className="grid min-h-screen place-items-center bg-slate-950">
-        <Loading label="Restoring session" />
-      </div>
-    );
-  if (user) return <Navigate to="/" replace />;
-  return (
-    <div className="relative grid min-h-screen bg-slate-950 px-4 py-10 text-white lg:grid-cols-2">
-      <div className="hidden items-center justify-center p-12 lg:flex">
-        <div className="max-w-lg">
-          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-blue-500">
-            <Wifi />
-          </span>
-          <p className="mt-8 text-sm font-bold uppercase tracking-[.2em] text-blue-300">
-            Cloudflare DDNS Manager
-          </p>
-          <h1 className="mt-4 text-5xl font-bold">Every selected record, always pointing home.</h1>
-          <div className="mt-10 grid grid-cols-3 gap-3">
-            <Feature icon={<Zap />} label="Automatic" />
-            <Feature icon={<ShieldCheck />} label="Secure" />
-            <Feature icon={<Globe2 />} label="Multi-zone" />
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center justify-center">
-        <Card className="w-full max-w-md p-8 text-slate-950 dark:text-white">
-          <h2 className="text-2xl font-bold">Welcome back</h2>
-          <p className="mt-1 text-sm text-slate-500">Sign in to manage dynamic DNS.</p>
-          {error && (
-            <div
-              role="alert"
-              className="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
-            >
-              {error}
-            </div>
-          )}
-          <form onSubmit={(event) => void submit(event)} className="mt-6 grid gap-5">
-            <Field label="Username" name="username" autoComplete="username" required />
-            <div className="relative">
-              <Field
-                label="Password"
-                name="password"
-                type={show ? 'text' : 'password'}
-                autoComplete="current-password"
-                required
-              />
-              <button
-                type="button"
-                aria-label={show ? 'Hide password' : 'Show password'}
-                onClick={() => setShow(!show)}
-                className="absolute bottom-2 right-2 p-2"
-              >
-                {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            <Button busy={busy}>
-              Sign in <ArrowRight className="h-4 w-4" />
-            </Button>
-          </form>
-        </Card>
-      </div>
-    </div>
-  );
-}
-function Feature({ icon, label }: { icon: ReactNode; label: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 p-4">
-      {icon}
-      <strong className="mt-2 block">{label}</strong>
-    </div>
-  );
 }
 
 export function HistoryPage() {
