@@ -336,36 +336,37 @@ export function PageTitle({
   );
 }
 
-/** Mask a technical value (IP, etc.) with reveal + copy — presentation only. */
+/** Mask a technical value (IP, etc.) with hide + copy — presentation only. Visible by default. */
 export function MaskedValue({
   value,
   label,
-  empty = '—'
+  empty = '—',
+  initiallyVisible = true
 }: {
   value?: string | null;
   label: string;
   empty?: string;
+  /** When true (default), the value is shown until the user hides it. */
+  initiallyVisible?: boolean;
 }) {
-  const [revealed, setRevealed] = useState(false);
+  const [visible, setVisible] = useState(initiallyVisible);
   if (!value) {
     return <span className="ops-mono text-slate-400">{empty}</span>;
   }
   const masked =
-    value.length <= 8
-      ? '••••••••'
-      : `${'•'.repeat(Math.min(value.length, 14))}`;
+    value.length <= 8 ? '••••••••' : `${'•'.repeat(Math.min(value.length, 14))}`;
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5">
       <span className="ops-mono truncate text-slate-800 dark:text-slate-100">
-        {revealed ? value : masked}
+        {visible ? value : masked}
       </span>
       <button
         type="button"
         className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-200"
-        aria-label={revealed ? `Hide ${label}` : `Reveal ${label}`}
-        onClick={() => setRevealed((current) => !current)}
+        aria-label={visible ? `Hide ${label}` : `Show ${label}`}
+        onClick={() => setVisible((current) => !current)}
       >
-        {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+        {visible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
       </button>
       <button
         type="button"

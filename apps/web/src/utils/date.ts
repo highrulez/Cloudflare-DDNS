@@ -13,20 +13,47 @@ function validDate(value: DateValue): Date | null {
 
 export function safeFormatDate(value: DateValue): string {
   const date = validDate(value);
-  if (!date) return 'Unavailable';
+  if (!date) return '—';
   try {
     return new Intl.DateTimeFormat(undefined, {
       dateStyle: 'medium',
       timeStyle: 'short'
     }).format(date);
   } catch {
-    return 'Unavailable';
+    return '—';
+  }
+}
+
+/** Absolute + relative pair for operational tables. Never throws on invalid input. */
+export function safeOperationalTimestamp(
+  value: DateValue,
+  now = Date.now()
+): { absolute: string; relative: string } | null {
+  const date = validDate(value);
+  if (!date) return null;
+  try {
+    const absolute = new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+      .format(date)
+      .replace(', ', ' · ')
+      .replace(/, (?=\d)/, ' · ');
+    return {
+      absolute,
+      relative: safeRelativeTime(date, now)
+    };
+  } catch {
+    return null;
   }
 }
 
 export function safeRelativeTime(value: DateValue, now = Date.now()): string {
   const date = validDate(value);
-  if (!date || !Number.isFinite(now)) return 'Unavailable';
+  if (!date || !Number.isFinite(now)) return '—';
   const differenceSeconds = Math.round((date.getTime() - now) / 1000);
   const absoluteSeconds = Math.abs(differenceSeconds);
   if (absoluteSeconds < 10) return 'Just now';
@@ -42,6 +69,6 @@ export function safeRelativeTime(value: DateValue, now = Date.now()): string {
   try {
     return new Intl.RelativeTimeFormat(undefined, { numeric: 'always' }).format(amount, unit);
   } catch {
-    return 'Unavailable';
+    return '—';
   }
 }

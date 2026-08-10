@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { safeFormatDate, safeRelativeTime, type DateValue } from './date';
+import {
+  safeFormatDate,
+  safeOperationalTimestamp,
+  safeRelativeTime,
+  type DateValue
+} from './date';
 
 describe('safe date formatting', () => {
   it.each([
@@ -8,16 +13,24 @@ describe('safe date formatting', () => {
     ['empty string', ''],
     ['unknown placeholder', 'unknown'],
     ['malformed date', 'not-a-real-date']
-  ] satisfies Array<[string, DateValue]>)('returns Unavailable for %s', (_label, value) => {
-    expect(safeFormatDate(value)).toBe('Unavailable');
-    expect(safeRelativeTime(value)).toBe('Unavailable');
+  ] satisfies Array<[string, DateValue]>)('returns an em dash for %s', (_label, value) => {
+    expect(safeFormatDate(value)).toBe('—');
+    expect(safeRelativeTime(value)).toBe('—');
+    expect(safeOperationalTimestamp(value)).toBeNull();
   });
 
   it('formats a valid ISO timestamp', () => {
     const timestamp = '2026-08-09T12:00:00.000Z';
-    expect(safeFormatDate(timestamp)).not.toBe('Unavailable');
+    expect(safeFormatDate(timestamp)).not.toBe('—');
     expect(safeRelativeTime(timestamp, Date.parse('2026-08-09T12:02:00.000Z'))).toBe(
       '2 minutes ago'
     );
+    const operational = safeOperationalTimestamp(
+      timestamp,
+      Date.parse('2026-08-09T12:02:00.000Z')
+    );
+    expect(operational).not.toBeNull();
+    expect(operational?.relative).toBe('2 minutes ago');
+    expect(operational?.absolute).toContain('2026');
   });
 });
