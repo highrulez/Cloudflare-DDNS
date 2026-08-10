@@ -23,9 +23,10 @@ describe("secret and session security", () => {
 
   it("enforces a fixed-window login limit", () => {
     const limiter = new LoginLimiter(2, 1000);
-    expect(limiter.consume("client", 0)).toBe(true);
-    expect(limiter.consume("client", 1)).toBe(true);
-    expect(limiter.consume("client", 2)).toBe(false);
-    expect(limiter.consume("client", 1001)).toBe(true);
+    expect(limiter.recordFailure("client", 0).blocked).toBe(false);
+    expect(limiter.recordFailure("client", 1).blocked).toBe(true);
+    expect(limiter.status("client", 2).blocked).toBe(true);
+    expect(limiter.status("client", 1001).blocked).toBe(false);
+    expect(limiter.recordFailure("client", 1001).blocked).toBe(false);
   });
 });

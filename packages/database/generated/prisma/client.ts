@@ -47,6 +47,11 @@ export { Prisma }
  */
 export type User = Prisma.UserModel
 /**
+ * Model AuthAuditEvent
+ * 
+ */
+export type AuthAuditEvent = Prisma.AuthAuditEventModel
+/**
  * Model Session
  * 
  */

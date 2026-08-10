@@ -10,13 +10,25 @@ import {
   ShieldCheck,
   User
 } from 'lucide-react';
-import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
+import { api } from '../api';
 import { useAuth } from '../auth';
 import { Loading, cx } from '../components/ui';
 import { APP_VERSION } from '../version';
 
-type AuthPhase = 'idle' | 'authenticating' | 'authenticated';
+type AuthPhase = 'idle' | 'verifying' | 'authenticating' | 'authenticated';
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (element: HTMLElement, options: Record<string, unknown>) => string;
+      reset: (widgetId?: string) => void;
+      remove: (widgetId?: string) => void;
+    };
+    onTurnstileLoad?: () => void;
+  }
+}
 
 export function LoginPage() {
   const { user, loading, login } = useAuth();
@@ -24,9 +36,21 @@ export function LoginPage() {
   const [phase, setPhase] = useState<AuthPhase>('idle');
   const [error, setError] = useState('');
   const [online, setOnline] = useState(true);
+  const [siteKey, setSiteKey] = useState('');
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const [turnstileReady, setTurnstileReady] = useState(false);
   const usernameId = useId();
   const passwordId = useId();
   const errorId = useId();
+  const widgetHostRef = useRef<HTMLDivElement>(null);
+  const widgetIdRef = useRef<string>();
+
+  const resetTurnstile = useCallback(() => {
+    setTurnstileToken('');
+    if (widgetIdRef.current && window.turnstile) {
+      window.turnstile.reset(widgetIdRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -42,17 +66,106 @@ export function LoginPage() {
     };
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .turnstileConfig()
+      .then((config) => {
+        if (!cancelled) setSiteKey(config.siteKey);
+      })
+      .catch((caught: Error) => {
+        if (!cancelled) setError(caught.message || 'Security verification is unavailable');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!siteKey || !widgetHostRef.current) return;
+
+    const mount = () => {
+      if (!widgetHostRef.current || !window.turnstile || widgetIdRef.current) return;
+      widgetIdRef.current = window.turnstile.render(widgetHostRef.current, {
+        sitekey: siteKey,
+        theme: 'dark',
+        appearance: 'interaction-only',
+        action: 'login',
+        callback: (token: string) => {
+          setTurnstileToken(token);
+          setTurnstileReady(true);
+          setPhase((current) => (current === 'verifying' ? 'idle' : current));
+        },
+        'expired-callback': () => {
+          setTurnstileToken('');
+          setTurnstileReady(false);
+        },
+        'error-callback': () => {
+          setTurnstileToken('');
+          setTurnstileReady(false);
+          setError('Security verification failed. Please try again.');
+        },
+        'timeout-callback': () => {
+          setTurnstileToken('');
+          setTurnstileReady(false);
+        }
+      });
+      setTurnstileReady(true);
+    };
+
+    setPhase((current) => (current === 'idle' ? 'verifying' : current));
+    if (window.turnstile) {
+      mount();
+      return () => {
+        if (widgetIdRef.current && window.turnstile) {
+          window.turnstile.remove(widgetIdRef.current);
+          widgetIdRef.current = undefined;
+        }
+      };
+    }
+
+    const existing = document.querySelector<HTMLScriptElement>('script[data-turnstile]');
+    if (existing) {
+      window.onTurnstileLoad = mount;
+    } else {
+      const script = document.createElement('script');
+      script.src =
+        'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad';
+      script.async = true;
+      script.defer = true;
+      script.dataset.turnstile = 'true';
+      window.onTurnstileLoad = mount;
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = undefined;
+      }
+    };
+  }, [siteKey]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!turnstileToken) {
+      setError('Security verification is still in progress. Please wait.');
+      return;
+    }
     setPhase('authenticating');
     setError('');
     const form = new FormData(event.currentTarget);
     try {
-      await login(String(form.get('username') ?? ''), String(form.get('password') ?? ''));
+      await login(
+        String(form.get('username') ?? ''),
+        String(form.get('password') ?? ''),
+        turnstileToken
+      );
       setPhase('authenticated');
     } catch (caught) {
       setPhase('idle');
       setError(caught instanceof Error ? caught.message : 'Sign in failed');
+      resetTurnstile();
     }
   };
 
@@ -64,7 +177,7 @@ export function LoginPage() {
     );
   if (user) return <Navigate to="/" replace />;
 
-  const busy = phase !== 'idle';
+  const busy = phase === 'authenticating' || phase === 'authenticated';
   const buttonLabel =
     phase === 'authenticating'
       ? 'Authenticating...'
@@ -212,9 +325,18 @@ export function LoginPage() {
                   </span>
                 </label>
 
+                <div className="grid gap-2">
+                  {(phase === 'verifying' || (!turnstileToken && turnstileReady)) && (
+                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                      Verifying secure connection...
+                    </p>
+                  )}
+                  <div ref={widgetHostRef} className="min-h-[65px]" />
+                </div>
+
                 <button
                   type="submit"
-                  disabled={busy}
+                  disabled={busy || !turnstileToken}
                   className="login-submit mt-1 inline-flex h-12 w-full items-center justify-center gap-3 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#3b82f6] px-5 text-sm font-bold uppercase tracking-[0.16em] text-white shadow-[0_10px_30px_-16px_rgba(37,99,235,0.9)] transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1220] active:translate-y-px active:brightness-95 disabled:cursor-wait disabled:opacity-80"
                 >
                   {phase === 'authenticating' && (

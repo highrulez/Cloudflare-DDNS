@@ -52,6 +52,14 @@ enum UpdateResult {
   ERROR
   UNCHANGED
 }
+enum AuthAuditEventType {
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGIN_RATE_LIMITED
+  TURNSTILE_FAILED
+  LOGOUT
+  SESSION_EXPIRED
+}
 
 model User {
   id           String    @id @default(cuid())
@@ -60,6 +68,18 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   sessions     Session[]
+}
+
+model AuthAuditEvent {
+  id        String             @id @default(cuid())
+  type      AuthAuditEventType
+  success   Boolean
+  sourceIp  String?            @db.VarChar(64)
+  userAgent String?            @db.VarChar(512)
+  username  String?            @db.VarChar(191)
+  createdAt DateTime           @default(now())
+  @@index([createdAt])
+  @@index([type])
 }
 
 model Session {

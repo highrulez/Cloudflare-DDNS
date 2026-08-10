@@ -25,10 +25,13 @@ export const runTriggerSchema = z.enum([
 
 export const loginSchema = z.object({
   username: z.string().trim().min(1).max(191),
-  password: z.string().min(8).max(256)
+  password: z.string().min(8).max(256),
+  // Cloudflare Turnstile tokens are single-use and max 2048 characters.
+  turnstileToken: z.string().trim().min(1).max(2048)
 });
 
-export const adminSetupSchema = loginSchema.extend({
+export const adminSetupSchema = z.object({
+  username: z.string().trim().min(1).max(191),
   password: z.string().min(12).max(256)
 });
 

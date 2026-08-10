@@ -398,6 +398,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   User: 'User',
+  AuthAuditEvent: 'AuthAuditEvent',
   Session: 'Session',
   SetupState: 'SetupState',
   CloudflareAccount: 'CloudflareAccount',
@@ -425,7 +426,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "setupState" | "cloudflareAccount" | "cloudflareZone" | "managedDnsRecord" | "appSettings" | "ipDetectionRun" | "ipDetectionResult" | "ddnsRun" | "ddnsUpdateLog" | "schedulerLease" | "schedulerState"
+    modelProps: "user" | "authAuditEvent" | "session" | "setupState" | "cloudflareAccount" | "cloudflareZone" | "managedDnsRecord" | "appSettings" | "ipDetectionRun" | "ipDetectionResult" | "ddnsRun" | "ddnsUpdateLog" | "schedulerLease" | "schedulerState"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -492,6 +493,72 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    AuthAuditEvent: {
+      payload: Prisma.$AuthAuditEventPayload<ExtArgs>
+      fields: Prisma.AuthAuditEventFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AuthAuditEventFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAuditEventPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AuthAuditEventFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAuditEventPayload>
+        }
+        findFirst: {
+          args: Prisma.AuthAuditEventFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAuditEventPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AuthAuditEventFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAuditEventPayload>
+        }
+        findMany: {
+          args: Prisma.AuthAuditEventFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAuditEventPayload>[]
+        }
+        create: {
+          args: Prisma.AuthAuditEventCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAuditEventPayload>
+        }
+        createMany: {
+          args: Prisma.AuthAuditEventCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        delete: {
+          args: Prisma.AuthAuditEventDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAuditEventPayload>
+        }
+        update: {
+          args: Prisma.AuthAuditEventUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAuditEventPayload>
+        }
+        deleteMany: {
+          args: Prisma.AuthAuditEventDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AuthAuditEventUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        upsert: {
+          args: Prisma.AuthAuditEventUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthAuditEventPayload>
+        }
+        aggregate: {
+          args: Prisma.AuthAuditEventAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAuthAuditEvent>
+        }
+        groupBy: {
+          args: Prisma.AuthAuditEventGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuthAuditEventGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AuthAuditEventCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuthAuditEventCountAggregateOutputType> | number
         }
       }
     }
@@ -1337,6 +1404,19 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const AuthAuditEventScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  success: 'success',
+  sourceIp: 'sourceIp',
+  userAgent: 'userAgent',
+  username: 'username',
+  createdAt: 'createdAt'
+} as const
+
+export type AuthAuditEventScalarFieldEnum = (typeof AuthAuditEventScalarFieldEnum)[keyof typeof AuthAuditEventScalarFieldEnum]
+
+
 export const SessionScalarFieldEnum = {
   id: 'id',
   tokenHash: 'tokenHash',
@@ -1551,6 +1631,24 @@ export const UserOrderByRelevanceFieldEnum = {
 export type UserOrderByRelevanceFieldEnum = (typeof UserOrderByRelevanceFieldEnum)[keyof typeof UserOrderByRelevanceFieldEnum]
 
 
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const AuthAuditEventOrderByRelevanceFieldEnum = {
+  id: 'id',
+  sourceIp: 'sourceIp',
+  userAgent: 'userAgent',
+  username: 'username'
+} as const
+
+export type AuthAuditEventOrderByRelevanceFieldEnum = (typeof AuthAuditEventOrderByRelevanceFieldEnum)[keyof typeof AuthAuditEventOrderByRelevanceFieldEnum]
+
+
 export const SessionOrderByRelevanceFieldEnum = {
   id: 'id',
   tokenHash: 'tokenHash',
@@ -1558,14 +1656,6 @@ export const SessionOrderByRelevanceFieldEnum = {
 } as const
 
 export type SessionOrderByRelevanceFieldEnum = (typeof SessionOrderByRelevanceFieldEnum)[keyof typeof SessionOrderByRelevanceFieldEnum]
-
-
-export const NullsOrder = {
-  first: 'first',
-  last: 'last'
-} as const
-
-export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 
 
 export const CloudflareAccountOrderByRelevanceFieldEnum = {
@@ -1712,6 +1802,20 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
 
 
 /**
+ * Reference to a field of type 'AuthAuditEventType'
+ */
+export type EnumAuthAuditEventTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AuthAuditEventType'>
+    
+
+
+/**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
  * Reference to a field of type 'Int'
  */
 export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -1729,13 +1833,6 @@ export type BytesFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, '
  * Reference to a field of type 'RecordType'
  */
 export type EnumRecordTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RecordType'>
-    
-
-
-/**
- * Reference to a field of type 'Boolean'
- */
-export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 
@@ -1953,6 +2050,7 @@ export interface PrismaClientOptionsWithAdapter extends PrismaClientBaseOptions 
 export type PrismaClientOptions = PrismaClientOptionsWithAccelerateUrl | PrismaClientOptionsWithAdapter
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
+  authAuditEvent?: Prisma.AuthAuditEventOmit
   session?: Prisma.SessionOmit
   setupState?: Prisma.SetupStateOmit
   cloudflareAccount?: Prisma.CloudflareAccountOmit

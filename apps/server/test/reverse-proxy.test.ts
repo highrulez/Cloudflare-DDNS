@@ -21,7 +21,10 @@ describe('Synology reverse proxy', () => {
       CLOUDFLARE_API_BASE: 'https://api.cloudflare.com/client/v4',
       IPV4_PROVIDERS: ['https://api4.ipify.org'],
       IPV6_PROVIDERS: ['https://api6.ipify.org'],
-      HTTP_TIMEOUT_MS: 5000
+      HTTP_TIMEOUT_MS: 5000,
+      TURNSTILE_EXPECTED_HOSTNAME: 'dns.highrulez.com',
+      TURNSTILE_EXPECTED_ACTION: 'login',
+      TURNSTILE_VERIFY_TIMEOUT_MS: 5000
     } satisfies Config;
     const app = await buildApp(database, config, { startScheduler: false });
     app.get('/test-proxy', async (request) => ({

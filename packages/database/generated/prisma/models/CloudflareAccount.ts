@@ -511,10 +511,6 @@ export type BytesFieldUpdateOperationsInput = {
   set?: runtime.Bytes
 }
 
-export type NullableStringFieldUpdateOperationsInput = {
-  set?: string | null
-}
-
 export type CloudflareAccountCreateNestedOneWithoutZonesInput = {
   create?: Prisma.XOR<Prisma.CloudflareAccountCreateWithoutZonesInput, Prisma.CloudflareAccountUncheckedCreateWithoutZonesInput>
   connectOrCreate?: Prisma.CloudflareAccountCreateOrConnectWithoutZonesInput

@@ -35,7 +35,28 @@ export async function buildApp(
     requestTimeout: 30_000
   });
   await app.register(cookie);
-  await app.register(helmet, { contentSecurityPolicy: false });
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+        formAction: ["'self'"],
+        imgSrc: ["'self'", 'data:'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        styleSrc: ["'self'", 'https://fonts.googleapis.com'],
+        scriptSrc: ["'self'", 'https://challenges.cloudflare.com'],
+        frameSrc: ['https://challenges.cloudflare.com'],
+        connectSrc: ["'self'", 'https://challenges.cloudflare.com'],
+        upgradeInsecureRequests: config.NODE_ENV === 'production' ? [] : null
+      }
+    },
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    xContentTypeOptions: true,
+    xFrameOptions: { action: 'deny' }
+  });
   registerSecurity(app, db, config);
 
   const engine = new DdnsEngine(db, config);

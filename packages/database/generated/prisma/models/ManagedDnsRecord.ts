@@ -770,10 +770,6 @@ export type EnumRecordTypeFieldUpdateOperationsInput = {
   set?: $Enums.RecordType
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
-}
-
 export type EnumRecordHealthFieldUpdateOperationsInput = {
   set?: $Enums.RecordHealth
 }

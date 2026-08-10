@@ -160,13 +160,13 @@ export type CloudflareZoneAggregateArgs<ExtArgs extends runtime.Types.Extensions
   _avg?: CloudflareZoneAvgAggregateInputType
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   *
+   * 
    * Select which fields to sum
   **/
   _sum?: CloudflareZoneSumAggregateInputType
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
-   *
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: CloudflareZoneMinAggregateInputType

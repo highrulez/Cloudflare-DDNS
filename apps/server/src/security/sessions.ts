@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { PrismaClient } from '@ddns/database';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { resolveAllowedOrigins, type Config } from '../config.js';
+import { writeAuthAudit } from './auth-audit.js';
 import { sessionHash } from './crypto.js';
 
 declare module 'fastify' {
@@ -17,6 +18,22 @@ export async function createSession(db: PrismaClient, config: Config, userId: st
     data: { tokenHash: sessionHash(token, config.SESSION_SECRET), userId, expiresAt }
   });
   return { token, expiresAt };
+}
+
+/** Invalidate any pre-auth cookie session, then issue a fresh post-login session. */
+export async function rotateSession(
+  db: PrismaClient,
+  config: Config,
+  request: FastifyRequest,
+  userId: string
+) {
+  const existing = request.cookies[config.COOKIE_NAME];
+  if (existing) {
+    await db.session
+      .deleteMany({ where: { tokenHash: sessionHash(existing, config.SESSION_SECRET) } })
+      .catch(() => undefined);
+  }
+  return createSession(db, config, userId);
 }
 
 /**
@@ -86,7 +103,14 @@ export function registerSecurity(app: FastifyInstance, db: PrismaClient, config:
       include: { user: { select: { id: true, username: true } } }
     });
     if (!session || session.expiresAt <= now) {
-      if (session) await db.session.delete({ where: { id: session.id } }).catch(() => undefined);
+      if (session) {
+        await db.session.delete({ where: { id: session.id } }).catch(() => undefined);
+        await writeAuthAudit(db, request.log, {
+          type: 'SESSION_EXPIRED',
+          success: false,
+          request
+        });
+      }
       clearSessionCookie(reply, config, request);
       return;
     }
@@ -107,21 +131,43 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
   }
 }
 
+/** Login-specific failed-attempt limiter: 5 failures / 10 minutes per source IP. */
 export class LoginLimiter {
   private readonly attempts = new Map<string, { count: number; resetsAt: number }>();
   constructor(
     private readonly limit = 5,
-    private readonly windowMs = 15 * 60_000
+    private readonly windowMs = 10 * 60_000
   ) {}
 
-  consume(key: string, now = Date.now()): boolean {
+  status(key: string, now = Date.now()): { blocked: boolean; retryAfterSeconds: number } {
+    const current = this.attempts.get(key);
+    if (!current || current.resetsAt <= now) {
+      if (current) this.attempts.delete(key);
+      return { blocked: false, retryAfterSeconds: 0 };
+    }
+    if (current.count >= this.limit) {
+      return {
+        blocked: true,
+        retryAfterSeconds: Math.max(1, Math.ceil((current.resetsAt - now) / 1000))
+      };
+    }
+    return { blocked: false, retryAfterSeconds: 0 };
+  }
+
+  recordFailure(key: string, now = Date.now()): { blocked: boolean; retryAfterSeconds: number } {
     const current = this.attempts.get(key);
     if (!current || current.resetsAt <= now) {
       this.attempts.set(key, { count: 1, resetsAt: now + this.windowMs });
-      return true;
+      return { blocked: false, retryAfterSeconds: 0 };
     }
     current.count += 1;
-    return current.count <= this.limit;
+    if (current.count >= this.limit) {
+      return {
+        blocked: true,
+        retryAfterSeconds: Math.max(1, Math.ceil((current.resetsAt - now) / 1000))
+      };
+    }
+    return { blocked: false, retryAfterSeconds: 0 };
   }
 
   clear(key: string) {

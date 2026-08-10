@@ -52,6 +52,7 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   User: 'User',
+  AuthAuditEvent: 'AuthAuditEvent',
   Session: 'Session',
   SetupState: 'SetupState',
   CloudflareAccount: 'CloudflareAccount',
@@ -91,6 +92,19 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const AuthAuditEventScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  success: 'success',
+  sourceIp: 'sourceIp',
+  userAgent: 'userAgent',
+  username: 'username',
+  createdAt: 'createdAt'
+} as const
+
+export type AuthAuditEventScalarFieldEnum = (typeof AuthAuditEventScalarFieldEnum)[keyof typeof AuthAuditEventScalarFieldEnum]
 
 
 export const SessionScalarFieldEnum = {
@@ -307,6 +321,24 @@ export const UserOrderByRelevanceFieldEnum = {
 export type UserOrderByRelevanceFieldEnum = (typeof UserOrderByRelevanceFieldEnum)[keyof typeof UserOrderByRelevanceFieldEnum]
 
 
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const AuthAuditEventOrderByRelevanceFieldEnum = {
+  id: 'id',
+  sourceIp: 'sourceIp',
+  userAgent: 'userAgent',
+  username: 'username'
+} as const
+
+export type AuthAuditEventOrderByRelevanceFieldEnum = (typeof AuthAuditEventOrderByRelevanceFieldEnum)[keyof typeof AuthAuditEventOrderByRelevanceFieldEnum]
+
+
 export const SessionOrderByRelevanceFieldEnum = {
   id: 'id',
   tokenHash: 'tokenHash',
@@ -314,14 +346,6 @@ export const SessionOrderByRelevanceFieldEnum = {
 } as const
 
 export type SessionOrderByRelevanceFieldEnum = (typeof SessionOrderByRelevanceFieldEnum)[keyof typeof SessionOrderByRelevanceFieldEnum]
-
-
-export const NullsOrder = {
-  first: 'first',
-  last: 'last'
-} as const
-
-export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 
 
 export const CloudflareAccountOrderByRelevanceFieldEnum = {

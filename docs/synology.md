@@ -92,9 +92,31 @@ Mutating browser requests must present an Origin that exactly matches an entry i
 **System → Overview** and confirm HTTPS, original host, client IP, secure cookies, and trusted-proxy
 handling are healthy.
 
-Direct LAN access at `http://192.168.68.100:8090` can load and authenticate without changing
-`APP_ORIGIN` or disabling production Secure cookies. LAN HTTP sessions use a non-Secure cookie for
-that HTTP origin only. Production HTTPS sessions continue to use Secure cookies.
+Direct LAN access at `http://192.168.68.100:8090` remains available for diagnostics and health
+checks. Authenticated production administration should use `https://dns.highrulez.com`.
+
+Turnstile Siteverify expects hostname `dns.highrulez.com` and action `login`. Do not disable
+Turnstile, skip Siteverify, or set `COOKIE_SECURE=false` globally to make raw-IP HTTP login work.
+LAN HTTP sessions may receive a non-Secure cookie for that HTTP origin only when a session is
+issued; production HTTPS sessions continue to use Secure cookies. Production Turnstile widgets
+bound to `dns.highrulez.com` will not validate against the raw LAN hostname.
+
+### Cloudflare Turnstile
+
+1. In the Cloudflare dashboard, create a Turnstile widget for hostname `dns.highrulez.com`.
+2. Mode: Managed. Theme: dark. Appearance: interaction-only (where supported). Action: `login`.
+3. Set in `.env` (never commit real secrets):
+
+```env
+TURNSTILE_SITE_KEY=...
+TURNSTILE_SECRET_KEY=...
+TURNSTILE_EXPECTED_HOSTNAME=dns.highrulez.com
+TURNSTILE_EXPECTED_ACTION=login
+```
+
+4. Redeploy the app container so compose injects the Turnstile env vars.
+5. Apply the MariaDB migration for authentication audit events (`AuthAuditEvent`) via the normal
+   deploy/migrate path before relying on audit persistence.
 
 To include release metadata in the System page, set these values before rebuilding:
 

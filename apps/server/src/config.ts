@@ -85,7 +85,15 @@ const schema = z
           .map((item) => item.trim())
           .filter(Boolean)
       ),
-    HTTP_TIMEOUT_MS: z.coerce.number().int().min(500).max(60_000).default(10_000)
+    HTTP_TIMEOUT_MS: z.coerce.number().int().min(500).max(60_000).default(10_000),
+    TURNSTILE_SITE_KEY: z.string().min(1).optional(),
+    TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+    TURNSTILE_EXPECTED_HOSTNAME: z.string().min(1).default('dns.highrulez.com'),
+    TURNSTILE_EXPECTED_ACTION: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,32}$/)
+      .default('login'),
+    TURNSTILE_VERIFY_TIMEOUT_MS: z.coerce.number().int().min(500).max(15_000).default(5_000)
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV === 'production' && !value.APP_ORIGIN) {
@@ -117,6 +125,22 @@ const schema = z
         message: 'COOKIE_SECURE must be enabled for a production HTTPS origin'
       });
     }
+    if (value.NODE_ENV === 'production') {
+      if (!value.TURNSTILE_SITE_KEY) {
+        context.addIssue({
+          code: 'custom',
+          path: ['TURNSTILE_SITE_KEY'],
+          message: 'TURNSTILE_SITE_KEY is required in production'
+        });
+      }
+      if (!value.TURNSTILE_SECRET_KEY) {
+        context.addIssue({
+          code: 'custom',
+          path: ['TURNSTILE_SECRET_KEY'],
+          message: 'TURNSTILE_SECRET_KEY is required in production'
+        });
+      }
+    }
   });
 
 export type Config = z.infer<typeof schema>;
@@ -130,4 +154,8 @@ export function resolveAllowedOrigins(config: Config): Set<string> {
   const origins = new Set(config.APP_ALLOWED_ORIGINS);
   if (config.APP_ORIGIN) origins.add(config.APP_ORIGIN);
   return origins;
+}
+
+export function turnstileEnabled(config: Config): boolean {
+  return Boolean(config.TURNSTILE_SITE_KEY && config.TURNSTILE_SECRET_KEY);
 }

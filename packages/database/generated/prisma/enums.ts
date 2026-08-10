@@ -80,3 +80,15 @@ export const UpdateResult = {
 } as const
 
 export type UpdateResult = (typeof UpdateResult)[keyof typeof UpdateResult]
+
+
+export const AuthAuditEventType = {
+  LOGIN_SUCCESS: 'LOGIN_SUCCESS',
+  LOGIN_FAILED: 'LOGIN_FAILED',
+  LOGIN_RATE_LIMITED: 'LOGIN_RATE_LIMITED',
+  TURNSTILE_FAILED: 'TURNSTILE_FAILED',
+  LOGOUT: 'LOGOUT',
+  SESSION_EXPIRED: 'SESSION_EXPIRED'
+} as const
+
+export type AuthAuditEventType = (typeof AuthAuditEventType)[keyof typeof AuthAuditEventType]
