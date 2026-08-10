@@ -14,11 +14,34 @@ const originSchema = z
     ) {
       context.addIssue({
         code: 'custom',
-        message: 'APP_ORIGIN must contain only scheme, host, and optional port'
+        message: 'Origin must contain only scheme, host, and optional port'
       });
     }
   })
   .transform((value) => new URL(value).origin);
+
+const allowedOriginsSchema = z
+  .string()
+  .default('')
+  .transform((value, context) => {
+    const items = value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const origins: string[] = [];
+    for (const item of items) {
+      const parsed = originSchema.safeParse(item);
+      if (!parsed.success) {
+        context.addIssue({
+          code: 'custom',
+          message: `Invalid APP_ALLOWED_ORIGINS entry: ${item}`
+        });
+        return z.NEVER;
+      }
+      origins.push(parsed.data);
+    }
+    return [...new Set(origins)];
+  });
 
 const schema = z
   .object({
@@ -39,6 +62,7 @@ const schema = z
       return key;
     }),
     APP_ORIGIN: originSchema.optional(),
+    APP_ALLOWED_ORIGINS: allowedOriginsSchema,
     COOKIE_NAME: z.string().min(1).default('cloudflare_ddns_session'),
     COOKIE_SECURE: z.stringbool().default(false),
     SESSION_TTL_SECONDS: z.coerce.number().int().min(300).max(2_592_000).default(43_200),
@@ -96,6 +120,14 @@ const schema = z
   });
 
 export type Config = z.infer<typeof schema>;
+
 export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Config {
   return schema.parse(environment);
+}
+
+/** Exact browser origins permitted for mutating requests. */
+export function resolveAllowedOrigins(config: Config): Set<string> {
+  const origins = new Set(config.APP_ALLOWED_ORIGINS);
+  if (config.APP_ORIGIN) origins.add(config.APP_ORIGIN);
+  return origins;
 }

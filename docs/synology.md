@@ -76,7 +76,9 @@ Create a Synology DSM reverse-proxy rule:
 - Destination hostname: `127.0.0.1`
 - Destination port: `8090`
 
-Set `APP_ORIGIN=https://dns.highrulez.com` and `COOKIE_SECURE=true`. Ensure Synology forwards:
+Set `APP_ORIGIN=https://dns.highrulez.com` and
+`APP_ALLOWED_ORIGINS=https://dns.highrulez.com,http://192.168.68.100:8090`. Keep
+`COOKIE_SECURE=true`. Ensure Synology forwards:
 
 - `X-Forwarded-Proto: https`
 - `X-Forwarded-Host: dns.highrulez.com`
@@ -85,8 +87,14 @@ Set `APP_ORIGIN=https://dns.highrulez.com` and `COOKIE_SECURE=true`. Ensure Syno
 
 Fastify trusts forwarded headers only from loopback (`127.0.0.1` or `::1`), matching the destination
 above. Direct LAN clients cannot spoof `request.protocol`, `request.hostname`, or `request.ip`.
-Do not expose port `8090` publicly. After signing in, open **System → Overview** and confirm HTTPS,
-original host, client IP, secure cookies, and trusted-proxy handling are healthy.
+Mutating browser requests must present an Origin that exactly matches an entry in
+`APP_ALLOWED_ORIGINS` (and/or `APP_ORIGIN`). Do not expose port `8090` publicly. After signing in, open
+**System → Overview** and confirm HTTPS, original host, client IP, secure cookies, and trusted-proxy
+handling are healthy.
+
+Direct LAN access at `http://192.168.68.100:8090` can load and authenticate without changing
+`APP_ORIGIN` or disabling production Secure cookies. LAN HTTP sessions use a non-Secure cookie for
+that HTTP origin only. Production HTTPS sessions continue to use Secure cookies.
 
 To include release metadata in the System page, set these values before rebuilding:
 

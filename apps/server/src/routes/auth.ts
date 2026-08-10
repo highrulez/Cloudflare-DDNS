@@ -34,14 +34,14 @@ export function registerAuthRoutes(app: FastifyInstance, db: PrismaClient, confi
     }
     limiter.clear(key);
     const session = await createSession(db, config, user.id);
-    setSessionCookie(reply, config, session.token, session.expiresAt);
+    setSessionCookie(reply, config, session.token, session.expiresAt, request);
     return { user: { id: user.id, username: user.username } };
   });
 
   app.post("/api/auth/logout", { preHandler: requireAuth }, async (request, reply) => {
     const token = request.cookies[config.COOKIE_NAME];
     if (token) await db.session.deleteMany({ where: { tokenHash: sessionHash(token, config.SESSION_SECRET) } });
-    clearSessionCookie(reply, config);
+    clearSessionCookie(reply, config, request);
     return reply.code(204).send();
   });
 
@@ -73,7 +73,7 @@ export function registerAuthRoutes(app: FastifyInstance, db: PrismaClient, confi
       data: { passwordHash: await argon2.hash(input.newPassword, { type: argon2.argon2id }) },
     });
     await db.session.deleteMany({ where: { userId: user.id } });
-    clearSessionCookie(reply, config);
+    clearSessionCookie(reply, config, request);
     return reply.code(204).send();
   });
 }

@@ -11,6 +11,7 @@ describe('Synology reverse proxy', () => {
       APP_HOST: '0.0.0.0',
       APP_PORT: 8090,
       APP_ORIGIN: 'https://dns.highrulez.com',
+      APP_ALLOWED_ORIGINS: ['https://dns.highrulez.com', 'http://192.168.68.100:8090'],
       DATABASE_URL: 'mysql://user:password@127.0.0.1:3307/ddns',
       SESSION_SECRET: 'a-session-secret-that-is-longer-than-32-characters',
       ENCRYPTION_KEY: Buffer.alloc(32),

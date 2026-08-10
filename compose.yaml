@@ -16,6 +16,7 @@ services:
       APP_HOST: 0.0.0.0
       APP_PORT: 8090
       APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN in .env}
+      APP_ALLOWED_ORIGINS: ${APP_ALLOWED_ORIGINS:-https://dns.highrulez.com,http://192.168.68.100:8090}
       TZ: ${TZ:-Asia/Kuala_Lumpur}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       APP_VERSION: ${APP_VERSION:-1.0.0}

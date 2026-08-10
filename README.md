@@ -67,7 +67,10 @@ Important values:
 
 - `APP_HOST`: Fastify bind address, fixed to `0.0.0.0` by Compose
 - `APP_PORT`: Fastify host-network port, fixed to `8090` by Compose
-- `APP_ORIGIN`: exact public browser origin, `https://dns.highrulez.com`
+- `APP_ORIGIN`: canonical public browser origin, `https://dns.highrulez.com`
+- `APP_ALLOWED_ORIGINS`: comma-separated exact browser origins permitted for mutating
+  requests, for example
+  `https://dns.highrulez.com,http://192.168.68.100:8090`
 - `DATABASE_URL`: complete URL for the existing Synology MariaDB database, such as
   `mysql://cloudflare_ddns:encoded-password@192.168.1.10:3307/cloudflare_ddns`
 - `ENCRYPTION_KEY`: canonical base64 for exactly 32 random bytes; encrypts API tokens
@@ -77,9 +80,13 @@ Important values:
 
 Never commit `.env`. Losing `ENCRYPTION_KEY` makes stored Cloudflare tokens unrecoverable.
 
-Fastify trusts Synology's forwarded protocol, host, port, and client-address headers. Origin
-validation and absolute public-origin reporting always use `APP_ORIGIN`; the application does not
-derive public URLs from the internal `127.0.0.1:8090` listener.
+Fastify trusts Synology's forwarded protocol, host, port, and client-address headers from
+loopback only. Origin validation uses an exact allowlist from `APP_ALLOWED_ORIGINS` plus
+`APP_ORIGIN`. Absolute public-origin reporting continues to use `APP_ORIGIN`.
+
+When `COOKIE_SECURE=true`, Secure session cookies are still emitted for HTTPS production
+requests. Direct HTTP LAN access can authenticate with a non-Secure cookie scoped to that
+HTTP origin only. Do not set `COOKIE_SECURE=false` for production HTTPS.
 
 ## Cloudflare API token
 
@@ -172,7 +179,8 @@ migrations before startup. It never creates a MariaDB server, database, or datab
 
 - **Port unavailable:** free TCP port `8090` on the Synology host before startup. Port `8080` is not
   used.
-- **Origin rejected:** make `APP_ORIGIN` exactly match the browser scheme, host, and port.
+- **Origin rejected:** make `APP_ORIGIN` and `APP_ALLOWED_ORIGINS` include the exact browser
+  scheme, host, and port being used.
 - **Database access denied:** verify the existing database, application user grants, TCP access, and
   URL-encoded `DATABASE_URL`.
 - **Token rejected:** confirm Bearer token permissions and zone-resource restrictions.

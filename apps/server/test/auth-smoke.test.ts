@@ -43,6 +43,7 @@ describe("authentication smoke flow", () => {
       APP_HOST: "127.0.0.1",
       APP_PORT: 8090,
       APP_ORIGIN: "https://dns.highrulez.com",
+      APP_ALLOWED_ORIGINS: ["https://dns.highrulez.com", "http://192.168.68.100:8090"],
       DATABASE_URL: "mysql://user:password@localhost:3306/ddns",
       SESSION_SECRET: "a-session-secret-that-is-longer-than-32-characters",
       ENCRYPTION_KEY: Buffer.alloc(32),
@@ -59,6 +60,12 @@ describe("authentication smoke flow", () => {
     const login = await app.inject({
       method: "POST",
       url: "/api/auth/login",
+      remoteAddress: "127.0.0.1",
+      headers: {
+        origin: "https://dns.highrulez.com",
+        "x-forwarded-proto": "https",
+        "x-forwarded-host": "dns.highrulez.com",
+      },
       payload: { username: user.username, password: "correct horse battery staple" },
     });
     expect(login.statusCode).toBe(200);

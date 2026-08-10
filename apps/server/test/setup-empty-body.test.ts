@@ -21,6 +21,7 @@ describe('setup body handling', () => {
       ENCRYPTION_KEY: Buffer.alloc(32),
       COOKIE_NAME: 'cloudflare_ddns_session',
       COOKIE_SECURE: false,
+      APP_ALLOWED_ORIGINS: [],
       SESSION_TTL_SECONDS: 3600,
       CLOUDFLARE_API_BASE: 'https://api.cloudflare.com/client/v4',
       IPV4_PROVIDERS: ['https://api.ipify.org'],

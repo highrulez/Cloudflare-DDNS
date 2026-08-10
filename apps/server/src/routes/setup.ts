@@ -72,7 +72,7 @@ export function registerSetupRoutes(app: FastifyInstance, db: PrismaClient, conf
         { isolationLevel: 'Serializable' }
       );
       const session = await createSession(db, config, user.id);
-      setSessionCookie(reply, config, session.token, session.expiresAt);
+      setSessionCookie(reply, config, session.token, session.expiresAt, request);
       return reply.code(201).send({ id: user.id, username: user.username, step: 2 });
     } catch (error) {
       if (error instanceof Error && error.message === 'ADMIN_EXISTS') {

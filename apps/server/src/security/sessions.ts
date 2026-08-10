@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { PrismaClient } from '@ddns/database';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import type { Config } from '../config.js';
+import { resolveAllowedOrigins, type Config } from '../config.js';
 import { sessionHash } from './crypto.js';
 
 declare module 'fastify' {
@@ -19,27 +19,43 @@ export async function createSession(db: PrismaClient, config: Config, userId: st
   return { token, expiresAt };
 }
 
+/**
+ * Production keeps COOKIE_SECURE=true.
+ * Secure cookies are only emitted on HTTPS requests (canonical reverse-proxy origin).
+ * Direct HTTP LAN access receives a non-Secure cookie for that HTTP origin only.
+ * This does not disable Secure cookies for production HTTPS.
+ */
+export function sessionCookieSecure(request: FastifyRequest, config: Config): boolean {
+  if (!config.COOKIE_SECURE) return false;
+  return request.protocol === 'https';
+}
+
 export function setSessionCookie(
   reply: FastifyReply,
   config: Config,
   token: string,
-  expiresAt: Date
+  expiresAt: Date,
+  request: FastifyRequest
 ) {
   reply.setCookie(config.COOKIE_NAME, token, {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
-    secure: config.COOKIE_SECURE,
+    secure: sessionCookieSecure(request, config),
     expires: expiresAt
   });
 }
 
-export function clearSessionCookie(reply: FastifyReply, config: Config) {
+export function clearSessionCookie(
+  reply: FastifyReply,
+  config: Config,
+  request: FastifyRequest
+) {
   reply.clearCookie(config.COOKIE_NAME, {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
-    secure: config.COOKIE_SECURE
+    secure: sessionCookieSecure(request, config)
   });
 }
 
@@ -48,11 +64,17 @@ export function registerSecurity(app: FastifyInstance, db: PrismaClient, config:
   app.addHook('onRequest', async (request, reply) => {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       const origin = request.headers.origin;
-      const expected = config.APP_ORIGIN ?? `${request.protocol}://${request.headers.host}`;
-      if (origin && origin !== expected) {
-        return reply
-          .code(403)
-          .send({ error: { code: 'BAD_ORIGIN', message: 'Request origin is not allowed' } });
+      if (origin) {
+        const allowed = resolveAllowedOrigins(config);
+        const permitted =
+          allowed.size > 0
+            ? allowed.has(origin)
+            : origin === `${request.protocol}://${request.headers.host}`;
+        if (!permitted) {
+          return reply
+            .code(403)
+            .send({ error: { code: 'BAD_ORIGIN', message: 'Request origin is not allowed' } });
+        }
       }
     }
 
@@ -65,14 +87,14 @@ export function registerSecurity(app: FastifyInstance, db: PrismaClient, config:
     });
     if (!session || session.expiresAt <= now) {
       if (session) await db.session.delete({ where: { id: session.id } }).catch(() => undefined);
-      clearSessionCookie(reply, config);
+      clearSessionCookie(reply, config, request);
       return;
     }
     request.authUser = session.user;
     if (session.expiresAt.getTime() - now.getTime() < config.SESSION_TTL_SECONDS * 500) {
       const expiresAt = new Date(now.getTime() + config.SESSION_TTL_SECONDS * 1_000);
       await db.session.update({ where: { id: session.id }, data: { expiresAt, lastSeenAt: now } });
-      setSessionCookie(reply, config, token, expiresAt);
+      setSessionCookie(reply, config, token, expiresAt, request);
     }
   });
 }
