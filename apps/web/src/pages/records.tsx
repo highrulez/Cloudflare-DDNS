@@ -2,6 +2,7 @@ import { Edit3, Plus, RefreshCw, Trash2, Unlink, Zap } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api, type Account, type PublicIp, type RecordItem } from '../api';
 import { CreateDnsRecordDialog } from '../components/dns';
+import { useStrongAuth } from '../components/strong-auth';
 import {
   Badge,
   Button,
@@ -19,6 +20,7 @@ import {
 
 export function RecordsPage() {
   const toast = useToast();
+  const { withStrongAuth } = useStrongAuth();
   const [records, setRecords] = useState<RecordItem[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [publicIp, setPublicIp] = useState<PublicIp>();
@@ -184,7 +186,7 @@ export function RecordsPage() {
     if (!remove) return;
     setBusy('delete');
     try {
-      await api.deleteCloudflareRecord(remove.id, confirmation);
+      await withStrongAuth(() => api.deleteCloudflareRecord(remove.id, confirmation));
       setRecords((items) => items.filter((item) => item.id !== remove.id));
       setRemove(undefined);
       setConfirmation('');

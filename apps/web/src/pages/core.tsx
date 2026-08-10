@@ -183,9 +183,11 @@ export function SettingsPage() {
       return toast('New passwords do not match.', 'error');
     setBusy('password');
     try {
+      const code = String(form.get('code') ?? '').trim();
       await api.changePassword({
         currentPassword: String(form.get('currentPassword') ?? ''),
-        newPassword: next
+        newPassword: next,
+        ...(code ? { code } : {})
       });
       event.currentTarget.reset();
       toast('Password changed. Sign in again with the new password.');
@@ -286,6 +288,14 @@ export function SettingsPage() {
                 type="password"
                 minLength={12}
                 required
+              />
+              <Field
+                label="Authenticator code (if MFA enabled)"
+                name="code"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                hint="Required when multi-factor authentication is enabled"
               />
               <Button busy={busy === 'password'}>Change password</Button>
             </form>

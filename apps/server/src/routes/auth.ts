@@ -10,11 +10,13 @@ import {
   clearSessionCookie,
   LoginLimiter,
   requireAuth,
+  requireRecentStrongAuth,
   rotateSession,
   setSessionCookie
 } from '../security/sessions.js';
 import { TurnstileError, verifyTurnstileToken } from '../security/turnstile.js';
 import { createMfaLoginChallenge } from './mfa.js';
+import { verifyTotpCode, decryptTotpSecret } from '../security/mfa.js';
 
 // Precomputed Argon2id hash used only to equalize timing when the username is unknown.
 const UNKNOWN_USER_HASH =
@@ -185,7 +187,12 @@ export function registerAuthRoutes(app: FastifyInstance, db: PrismaClient, confi
     const input = z
       .object({
         currentPassword: z.string().min(1).max(256),
-        newPassword: z.string().min(12).max(256)
+        newPassword: z.string().min(12).max(256),
+        code: z
+          .string()
+          .trim()
+          .regex(/^\d{6}$/)
+          .optional()
       })
       .parse(request.body);
     const user = await db.user.findUnique({ where: { id: request.authUser!.id } });
@@ -194,12 +201,103 @@ export function registerAuthRoutes(app: FastifyInstance, db: PrismaClient, confi
         error: { code: 'INVALID_PASSWORD', message: 'Current password is incorrect' }
       });
     }
+    if (user.mfaEnabled) {
+      if (!input.code) {
+        return reply.code(401).send({
+          error: { code: 'MFA_REQUIRED', message: 'Authenticator code is required.' }
+        });
+      }
+      if (
+        !user.mfaSecretCiphertext ||
+        !user.mfaSecretIv ||
+        !user.mfaSecretAuthTag
+      ) {
+        return reply.code(400).send({
+          error: { code: 'MFA_DISABLED', message: 'Multi-factor authentication is not enabled.' }
+        });
+      }
+      const secret = decryptTotpSecret(
+        {
+          ciphertext: Buffer.from(user.mfaSecretCiphertext),
+          iv: Buffer.from(user.mfaSecretIv),
+          authTag: Buffer.from(user.mfaSecretAuthTag),
+          keyVersion: user.mfaSecretKeyVersion ?? 1
+        },
+        config.ENCRYPTION_KEY
+      );
+      const step = verifyTotpCode(secret, user.username, input.code, user.mfaLastUsedStep);
+      if (step === null) {
+        return reply.code(401).send({
+          error: { code: 'MFA_INVALID', message: 'Invalid authentication code.' }
+        });
+      }
+      await db.user.update({
+        where: { id: user.id },
+        data: { mfaLastUsedStep: step }
+      });
+    }
     await db.user.update({
       where: { id: user.id },
       data: { passwordHash: await argon2.hash(input.newPassword, { type: argon2.argon2id }) }
     });
     await db.session.deleteMany({ where: { userId: user.id } });
     clearSessionCookie(reply, config, request);
+    await writeAuthAudit(db, request.log, {
+      type: 'PASSWORD_CHANGED',
+      success: true,
+      request,
+      username: user.username
+    });
     return reply.code(204).send();
   });
+
+  app.get('/api/auth/sessions', { preHandler: requireAuth }, async (request) => {
+    const sessions = await db.session.findMany({
+      where: { userId: request.authUser!.id },
+      select: {
+        id: true,
+        createdAt: true,
+        lastSeenAt: true,
+        expiresAt: true,
+        stronglyAuthenticatedUntil: true
+      },
+      orderBy: { lastSeenAt: 'desc' }
+    });
+    return {
+      items: sessions.map((session) => ({
+        current: session.id === request.authSessionId,
+        createdAt: session.createdAt,
+        lastSeenAt: session.lastSeenAt,
+        expiresAt: session.expiresAt,
+        stronglyAuthenticated:
+          Boolean(session.stronglyAuthenticatedUntil) &&
+          session.stronglyAuthenticatedUntil! > new Date()
+      }))
+    };
+  });
+
+  app.post(
+    '/api/auth/sessions/revoke-others',
+    { preHandler: [requireAuth, requireRecentStrongAuth(db)] },
+    async (request, reply) => {
+      if (!request.authSessionId) {
+        return reply.code(401).send({
+          error: { code: 'UNAUTHENTICATED', message: 'Authentication required' }
+        });
+      }
+      const result = await db.session.deleteMany({
+        where: {
+          userId: request.authUser!.id,
+          id: { not: request.authSessionId }
+        }
+      });
+      await writeAuthAudit(db, request.log, {
+        type: 'SECURITY_SETTING_CHANGED',
+        success: true,
+        request,
+        username: request.authUser?.username
+      });
+      return { revoked: result.count };
+    }
+  );
 }

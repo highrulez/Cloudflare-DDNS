@@ -511,8 +511,20 @@ export const api = {
   }),
   updateProfile: (data: { username: string }) =>
     request<{ user: User }>('/auth/profile', body('PATCH', data)),
-  changePassword: (data: { currentPassword: string; newPassword: string }) =>
+  changePassword: (data: { currentPassword: string; newPassword: string; code?: string }) =>
     request<void>('/auth/password', body('PUT', data)),
+  listSessions: () =>
+    request<{
+      items: Array<{
+        current: boolean;
+        createdAt: string;
+        lastSeenAt: string;
+        expiresAt: string;
+        stronglyAuthenticated: boolean;
+      }>;
+    }>('/auth/sessions'),
+  revokeOtherSessions: () =>
+    request<{ revoked: number }>('/auth/sessions/revoke-others', body('POST')),
   login: async (username: string, password: string, turnstileToken: string) => {
     const result = await request<{ user?: User; mfaRequired?: boolean }>(
       '/auth/login',

@@ -18,7 +18,8 @@ import {
   RequestError,
   writeAudit
 } from '../records/service.js';
-import { requireAuth } from '../security/sessions.js';
+import { requireAuth, requireRecentStrongAuth } from '../security/sessions.js';
+import { writeAuthAudit } from '../security/auth-audit.js';
 
 export function registerRecordRoutes(
   app: FastifyInstance,
@@ -27,6 +28,7 @@ export function registerRecordRoutes(
   engine: DdnsEngine,
   scheduler: Scheduler
 ) {
+  const strongAuth = requireRecentStrongAuth(db);
   app.get('/api/records', { preHandler: requireAuth }, async (request) => {
     const query = request.query as Record<string, unknown>;
     const { page, pageSize } = paginationSchema.parse(query);
@@ -264,7 +266,10 @@ export function registerRecordRoutes(
     return reply.code(204).send();
   });
 
-  app.delete('/api/records/:id/cloudflare', { preHandler: requireAuth }, async (request, reply) => {
+  app.delete(
+    '/api/records/:id/cloudflare',
+    { preHandler: [requireAuth, strongAuth] },
+    async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = deleteCloudflareRecordSchema.parse(request.body);
     const record = await db.managedDnsRecord.findUnique({ where: { id } });
@@ -304,6 +309,12 @@ export function registerRecordRoutes(
       }),
       db.managedDnsRecord.delete({ where: { id } })
     ]);
+    await writeAuthAudit(db, request.log, {
+      type: 'DNS_RECORD_DELETED',
+      success: true,
+      request,
+      username: request.authUser?.username
+    });
     return reply.code(204).send();
   });
 }

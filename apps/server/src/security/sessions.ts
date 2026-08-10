@@ -192,6 +192,54 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply):
   }
 }
 
+/**
+ * Gate sensitive mutations behind a recent password (+ TOTP when MFA is enabled) step-up.
+ * Frontend should treat 403 STRONG_AUTH_REQUIRED as a signal to open the re-auth modal.
+ */
+export function requireRecentStrongAuth(db: PrismaClient) {
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    if (!request.authUser) {
+      await reply
+        .code(401)
+        .send({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+      return;
+    }
+    if (!(await hasRecentStrongReauth(db, request.authSessionId))) {
+      await reply.code(403).send({
+        error: {
+          code: 'STRONG_AUTH_REQUIRED',
+          message: 'This action requires recent security verification.'
+        }
+      });
+      return;
+    }
+  };
+}
+
+/** Assert strong auth inside a handler (e.g. only when a token is present in PATCH). */
+export async function assertRecentStrongAuth(
+  db: PrismaClient,
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<boolean> {
+  if (!request.authUser) {
+    await reply
+      .code(401)
+      .send({ error: { code: 'UNAUTHENTICATED', message: 'Authentication required' } });
+    return false;
+  }
+  if (!(await hasRecentStrongReauth(db, request.authSessionId))) {
+    await reply.code(403).send({
+      error: {
+        code: 'STRONG_AUTH_REQUIRED',
+        message: 'This action requires recent security verification.'
+      }
+    });
+    return false;
+  }
+  return true;
+}
+
 /** Login-specific failed-attempt limiter: 5 failures / 10 minutes per source IP. */
 export class LoginLimiter {
   private readonly attempts = new Map<string, { count: number; resetsAt: number }>();
@@ -233,5 +281,12 @@ export class LoginLimiter {
 
   clear(key: string) {
     this.attempts.delete(key);
+  }
+}
+
+/** Reauth brute-force limiter: 5 failures / 10 minutes per authenticated session. */
+export class ReauthLimiter extends LoginLimiter {
+  constructor() {
+    super(5, 10 * 60_000);
   }
 }

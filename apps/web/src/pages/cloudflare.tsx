@@ -20,6 +20,7 @@ import {
   type ZoneDiscovery
 } from '../api';
 import { CreateDnsRecordDialog } from '../components/dns';
+import { useStrongAuth } from '../components/strong-auth';
 import {
   Badge,
   Button,
@@ -35,6 +36,7 @@ import {
 
 export function CloudflarePage() {
   const toast = useToast();
+  const { withStrongAuth } = useStrongAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,7 +49,7 @@ export function CloudflarePage() {
   const [selected, setSelected] = useState<Record<string, DiscoveredRecord>>({});
   const [createOpen, setCreateOpen] = useState(false);
   const [remove, setRemove] = useState<Account>();
-
+  const [removeConfirm, setRemoveConfirm] = useState('');
   const loadAccounts = async () => {
     setLoading(true);
     setError('');
@@ -85,10 +87,12 @@ export function CloudflarePage() {
     setBusy('connect');
     const form = new FormData(event.currentTarget);
     try {
-      const result = await api.addAccount({
-        name: String(form.get('name') ?? ''),
-        token: String(form.get('token') ?? '')
-      });
+      const result = await withStrongAuth(() =>
+        api.addAccount({
+          name: String(form.get('name') ?? ''),
+          token: String(form.get('token') ?? '')
+        })
+      );
       setAccounts((items) => [...items, result.account]);
       setConnectOpen(false);
       toast('Cloudflare account connected and zones discovered.');
@@ -142,12 +146,13 @@ export function CloudflarePage() {
   };
 
   const deleteAccount = async () => {
-    if (!remove) return;
+    if (!remove || removeConfirm !== 'DELETE') return;
     setBusy('delete');
     try {
-      await api.deleteAccount(remove.id);
+      await withStrongAuth(() => api.deleteAccount(remove.id));
       setAccounts((items) => items.filter((item) => item.id !== remove.id));
       setRemove(undefined);
+      setRemoveConfirm('');
       toast('Cloudflare account removed. Cloudflare DNS records were not changed.');
     } catch (caught) {
       toast(caught instanceof Error ? caught.message : 'Could not remove account', 'error');
@@ -163,10 +168,13 @@ export function CloudflarePage() {
     const form = new FormData(event.currentTarget);
     const token = String(form.get('token') ?? '');
     try {
-      const result = await api.updateAccount(edit.id, {
+      const payload = {
         name: String(form.get('name') ?? ''),
         ...(token ? { token } : {})
-      });
+      };
+      const result = await (token
+        ? withStrongAuth(() => api.updateAccount(edit.id, payload))
+        : api.updateAccount(edit.id, payload));
       setAccounts((items) => items.map((item) => (item.id === edit.id ? result.account : item)));
       setEdit(undefined);
       toast('Cloudflare account updated and zones refreshed.');
@@ -400,7 +408,9 @@ export function CloudflarePage() {
                     <h2 className="font-bold">{item.name}</h2>
                     <Badge status={item.status} />
                   </div>
-                  <p className="text-sm text-slate-500">Token {item.tokenHint}</p>
+                  <p className="text-sm text-slate-500">
+                    API token •••••••••••••••• Configured ({item.tokenHint})
+                  </p>
                 </div>
               </div>
               <div className="mt-5 rounded-xl bg-slate-50 p-4 dark:bg-slate-950">
@@ -458,12 +468,18 @@ export function CloudflarePage() {
         open={Boolean(edit)}
         onClose={() => setEdit(undefined)}
         title="Edit Cloudflare Account"
-        description="Leave the token blank to keep it. Replacing it refreshes all accessible zones."
+        description="Leave blank to keep the existing token. Enter a completely new token to replace it — existing tokens are never shown."
       >
         {edit && (
           <form onSubmit={(event) => void updateAccount(event)} className="grid gap-4">
             <Field label="Account name" name="name" defaultValue={edit.name} required />
-            <Field label="Replace API token" name="token" type="password" hint="Optional" />
+            <Field
+              label="Replace API token"
+              name="token"
+              type="password"
+              autoComplete="off"
+              hint={`Currently configured (${edit.tokenHint}). Leave blank to keep it.`}
+            />
             <div className="flex justify-end gap-2">
               <Button type="button" variant="secondary" onClick={() => setEdit(undefined)}>
                 Cancel
@@ -475,17 +491,40 @@ export function CloudflarePage() {
       </Dialog>
       <Dialog
         open={Boolean(remove)}
-        onClose={() => setRemove(undefined)}
+        onClose={() => {
+          setRemove(undefined);
+          setRemoveConfirm('');
+        }}
         title="Remove Cloudflare Account?"
-        description="The account can only be removed after all managed records are stopped. Cloudflare DNS records are never deleted by this action."
+        description="This removes the connection from DDNS Manager. Managed records must already be stopped. Cloudflare DNS records are never deleted by this action."
       >
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setRemove(undefined)}>
-            Cancel
-          </Button>
-          <Button variant="danger" busy={busy === 'delete'} onClick={() => void deleteAccount()}>
-            Remove account
-          </Button>
+        <div className="grid gap-4">
+          <Field
+            label='Type DELETE to confirm'
+            name="confirmDelete"
+            value={removeConfirm}
+            onChange={(event) => setRemoveConfirm(event.target.value)}
+            autoComplete="off"
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setRemove(undefined);
+                setRemoveConfirm('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              busy={busy === 'delete'}
+              disabled={removeConfirm !== 'DELETE'}
+              onClick={() => void deleteAccount()}
+            >
+              Delete connection
+            </Button>
+          </div>
         </div>
       </Dialog>
     </div>

@@ -5,7 +5,12 @@ import type { Config } from '../config.js';
 import { CloudflareClient } from '../cloudflare/client.js';
 import { cloudflareContext, detectCurrentAddresses, discoveryStatus } from '../records/service.js';
 import { decryptSecret, encryptSecret } from '../security/crypto.js';
-import { requireAuth } from '../security/sessions.js';
+import { writeAuthAudit } from '../security/auth-audit.js';
+import {
+  assertRecentStrongAuth,
+  requireAuth,
+  requireRecentStrongAuth
+} from '../security/sessions.js';
 
 function publicAccount(account: {
   id: string;
@@ -93,6 +98,8 @@ async function reconcileZones(db: PrismaClient, accountId: string, client: Cloud
 }
 
 export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient, config: Config) {
+  const strongAuth = requireRecentStrongAuth(db);
+
   app.get('/api/cloudflare/accounts', { preHandler: requireAuth }, async () => {
     const accounts = await db.cloudflareAccount.findMany({
       select: {
@@ -121,7 +128,10 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
     return { items: accounts };
   });
 
-  app.post('/api/cloudflare/accounts', { preHandler: requireAuth }, async (request, reply) => {
+  app.post(
+    '/api/cloudflare/accounts',
+    { preHandler: [requireAuth, strongAuth] },
+    async (request, reply) => {
     const input = cloudflareAccountSchema.parse(request.body);
     const client = new CloudflareClient(
       input.token,
@@ -166,6 +176,12 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
         zones: true
       }
     });
+    await writeAuthAudit(db, request.log, {
+      type: 'CLOUDFLARE_CREDENTIAL_ADDED',
+      success: true,
+      request,
+      username: request.authUser?.username
+    });
     return reply.code(201).send(publicAccount(account));
   });
 
@@ -198,7 +214,10 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
     }
   );
 
-  app.put('/api/cloudflare/accounts/:id/token', { preHandler: requireAuth }, async (request) => {
+  app.put(
+    '/api/cloudflare/accounts/:id/token',
+    { preHandler: [requireAuth, strongAuth] },
+    async (request) => {
     const { id } = request.params as { id: string };
     const token = (request.body as { token?: unknown })?.token;
     const input = cloudflareAccountSchema.pick({ token: true }).parse({ token });
@@ -232,15 +251,22 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
         updatedAt: true
       }
     });
+    await writeAuthAudit(db, request.log, {
+      type: 'CLOUDFLARE_CREDENTIAL_CHANGED',
+      success: true,
+      request,
+      username: request.authUser?.username
+    });
     return account;
   });
 
-  app.patch('/api/cloudflare/accounts/:id', { preHandler: requireAuth }, async (request) => {
+  app.patch('/api/cloudflare/accounts/:id', { preHandler: requireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const input = cloudflareAccountSchema.partial().parse(request.body);
     let tokenData = {};
     let replacementClient: CloudflareClient | undefined;
     if (input.token) {
+      if (!(await assertRecentStrongAuth(db, request, reply))) return;
       const client = new CloudflareClient(
         input.token,
         fetch,
@@ -270,6 +296,12 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
     });
     if (replacementClient) {
       await reconcileZones(db, id, replacementClient);
+      await writeAuthAudit(db, request.log, {
+        type: 'CLOUDFLARE_CREDENTIAL_CHANGED',
+        success: true,
+        request,
+        username: request.authUser?.username
+      });
     }
     return db.cloudflareAccount.findUniqueOrThrow({
       where: { id },
@@ -381,7 +413,7 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
 
   app.delete(
     '/api/cloudflare/accounts/:id',
-    { preHandler: requireAuth },
+    { preHandler: [requireAuth, strongAuth] },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       if (await db.managedDnsRecord.count({ where: { accountId: id } })) {
@@ -393,6 +425,12 @@ export function registerCloudflareRoutes(app: FastifyInstance, db: PrismaClient,
         });
       }
       await db.cloudflareAccount.delete({ where: { id } });
+      await writeAuthAudit(db, request.log, {
+        type: 'CLOUDFLARE_CONNECTION_REMOVED',
+        success: true,
+        request,
+        username: request.authUser?.username
+      });
       return reply.code(204).send();
     }
   );

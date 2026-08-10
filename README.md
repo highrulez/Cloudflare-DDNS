@@ -169,6 +169,12 @@ There is no email or SMS recovery path. If you lose both the authenticator and a
 there is no web-based bypass—restore access only through a controlled self-hosted recovery procedure
 on the server.
 
+Sensitive administrative actions (Cloudflare credential changes, deleting a DNS record from
+Cloudflare, signing out other sessions) require recent step-up verification: current password, plus
+TOTP when MFA is enabled. Strong verification lasts five minutes and is stored only on the server
+session (`stronglyAuthenticatedUntil`). Recovery codes are not accepted for routine step-up
+verification. Turnstile is not shown again for authenticated step-up.
+
 ## Cloudflare API token
 
 Create a scoped API token in the Cloudflare dashboard. Grant:

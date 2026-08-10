@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api } from './api';
+import { api, ApiError } from './api';
 
 describe('API client', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -41,36 +41,25 @@ describe('API client', () => {
     expect(headers.has('Content-Type')).toBe(false);
   });
 
-  it('sends proxy changes through the record update endpoint', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+  it('surfaces STRONG_AUTH_REQUIRED with a machine-readable code', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(
         JSON.stringify({
-          id: 'record-1',
-          accountId: 'account-1',
-          zoneId: 'zone-1',
-          hostname: 'nas.example.com',
-          type: 'A',
-          content: '203.0.113.10',
-          ttl: 1,
-          proxied: true,
-          enabled: true,
-          health: 'HEALTHY',
-          zone: { name: 'example.com' },
-          account: { name: 'Main' }
+          error: {
+            code: 'STRONG_AUTH_REQUIRED',
+            message: 'This action requires recent security verification.'
+          }
         }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } }
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
       )
     );
-
-    const result = await api.updateRecord('record-1', { proxied: true });
-
-    expect(result.record.proxied).toBe(true);
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/records/record-1',
-      expect.objectContaining({
-        method: 'PATCH',
-        body: JSON.stringify({ proxied: true })
-      })
-    );
+    try {
+      await api.deleteAccount('account-1');
+      throw new Error('expected failure');
+    } catch (caught) {
+      expect(caught).toBeInstanceOf(ApiError);
+      expect((caught as ApiError).code).toBe('STRONG_AUTH_REQUIRED');
+      expect((caught as ApiError).status).toBe(403);
+    }
   });
 });

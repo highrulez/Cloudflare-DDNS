@@ -2,6 +2,7 @@ import { Copy, Download, KeyRound, ShieldCheck, ShieldOff } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { api } from '../api';
 import { useAuth } from '../auth';
+import { useStrongAuth } from './strong-auth';
 import { Button, Card, Field, Loading, useToast } from './ui';
 import { safeFormatDate } from '../utils/date';
 
@@ -17,10 +18,20 @@ type EnrollState = {
   setupKey: string;
 };
 
+type SessionRow = {
+  current: boolean;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  stronglyAuthenticated: boolean;
+};
+
 export function MfaSettingsCard() {
   const { setUser } = useAuth();
+  const { withStrongAuth, setMfaEnabled } = useStrongAuth();
   const toast = useToast();
   const [status, setStatus] = useState<MfaStatus | null>(null);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -34,7 +45,10 @@ export function MfaSettingsCard() {
   const reload = async () => {
     setLoading(true);
     try {
-      setStatus(await api.mfaStatus());
+      const [mfa, sessionList] = await Promise.all([api.mfaStatus(), api.listSessions()]);
+      setStatus(mfa);
+      setMfaEnabled(mfa.enabled);
+      setSessions(sessionList.items);
       setError('');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Could not load MFA status');
@@ -46,6 +60,19 @@ export function MfaSettingsCard() {
   useEffect(() => {
     void reload();
   }, []);
+
+  const revokeOthers = async () => {
+    setBusy('sessions');
+    try {
+      const result = await withStrongAuth(() => api.revokeOtherSessions());
+      toast(`Signed out ${result.revoked} other session${result.revoked === 1 ? '' : 's'}.`);
+      await reload();
+    } catch (caught) {
+      toast(caught instanceof Error ? caught.message : 'Could not sign out other sessions', 'error');
+    } finally {
+      setBusy('');
+    }
+  };
 
   const startEnroll = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -165,6 +192,27 @@ export function MfaSettingsCard() {
             Add an authenticator app as an additional security layer for your account.
           </p>
         </div>
+      </div>
+
+      <div className="mt-5 grid gap-2 rounded-xl border border-slate-200 p-4 text-sm dark:border-slate-800">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+          Security status
+        </p>
+        <StatusRow label="Password" value="Configured" />
+        <StatusRow label="Turnstile" value="Protected" />
+        <StatusRow label="MFA" value={status?.enabled ? 'Enabled' : 'Disabled'} />
+        <StatusRow
+          label="Recovery codes"
+          value={
+            status?.enabled
+              ? `${status.recoveryCodesRemaining} remaining`
+              : 'Not applicable'
+          }
+        />
+        <StatusRow
+          label="Session"
+          value={sessions.some((session) => session.current) ? 'Active' : 'Unknown'}
+        />
       </div>
 
       {error && (
@@ -351,6 +399,61 @@ export function MfaSettingsCard() {
           </Button>
         </div>
       )}
+
+      <div className="mt-8 border-t border-slate-200 pt-6 dark:border-slate-800">
+        <h3 className="text-base font-bold">Sessions</h3>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Active browser sessions for this account. Session identifiers are never shown.
+        </p>
+        <div className="mt-4 grid gap-3">
+          {sessions.length === 0 ? (
+            <p className="text-sm text-slate-500">No session details available.</p>
+          ) : (
+            sessions.map((session, index) => (
+              <div
+                key={`${session.createdAt}-${index}`}
+                className="rounded-xl border border-slate-200 px-4 py-3 text-sm dark:border-slate-800"
+              >
+                <p className="font-semibold">
+                  {session.current ? 'Current session' : 'Other session'}
+                </p>
+                <p className="mt-1 text-slate-500 dark:text-slate-400">
+                  Signed in: {safeFormatDate(session.createdAt)}
+                </p>
+                <p className="text-slate-500 dark:text-slate-400">
+                  Last activity: {safeFormatDate(session.lastSeenAt)}
+                </p>
+                {session.stronglyAuthenticated && (
+                  <p className="mt-1 text-emerald-700 dark:text-emerald-300">
+                    Strong verification active
+                  </p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+        {sessions.some((session) => !session.current) && (
+          <div className="mt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              busy={busy === 'sessions'}
+              onClick={() => void revokeOthers()}
+            >
+              Sign out other sessions
+            </Button>
+          </div>
+        )}
+      </div>
     </Card>
+  );
+}
+
+function StatusRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="font-medium text-slate-800 dark:text-slate-100">{value}</span>
+    </div>
   );
 }

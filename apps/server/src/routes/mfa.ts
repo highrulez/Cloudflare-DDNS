@@ -25,6 +25,7 @@ import {
   clearSessionCookie,
   hasRecentStrongReauth,
   markStrongReauth,
+  ReauthLimiter,
   requireAuth,
   rotateSession,
   setMfaChallengeCookie,
@@ -122,6 +123,8 @@ export async function createMfaLoginChallenge(
 }
 
 export function registerMfaRoutes(app: FastifyInstance, db: PrismaClient, config: Config) {
+  const reauthLimiter = new ReauthLimiter();
+
   app.post('/api/auth/mfa/verify', async (request, reply) => {
     const input = z
       .object({
@@ -510,7 +513,7 @@ export function registerMfaRoutes(app: FastifyInstance, db: PrismaClient, config
     return reply.code(204).send();
   });
 
-  /** Foundation for later sensitive-action gates: password + TOTP → short-lived strong reauth. */
+  /** Password (+ TOTP when MFA enabled) → short-lived strong reauth window for sensitive actions. */
   app.post('/api/auth/reauth', { preHandler: requireAuth }, async (request, reply) => {
     const input = z
       .object({
@@ -518,24 +521,60 @@ export function registerMfaRoutes(app: FastifyInstance, db: PrismaClient, config
         code: totpCodeSchema.optional()
       })
       .parse(request.body);
+    const sessionKey = request.authSessionId ?? request.authUser!.id;
+    const blocked = reauthLimiter.status(sessionKey);
+    if (blocked.blocked) {
+      await writeAuthAudit(db, request.log, {
+        type: 'REAUTH_RATE_LIMITED',
+        success: false,
+        request,
+        username: request.authUser?.username
+      });
+      return reply
+        .code(429)
+        .header('retry-after', String(blocked.retryAfterSeconds))
+        .send({
+          error: {
+            code: 'RATE_LIMITED',
+            message: 'Too many verification attempts. Please try again later.'
+          }
+        });
+    }
+
+    const fail = async (code: string, message: string, status = 401) => {
+      const after = reauthLimiter.recordFailure(sessionKey);
+      await writeAuthAudit(db, request.log, {
+        type: after.blocked ? 'REAUTH_RATE_LIMITED' : 'REAUTH_FAILED',
+        success: false,
+        request,
+        username: request.authUser?.username
+      });
+      if (after.blocked) {
+        return reply
+          .code(429)
+          .header('retry-after', String(after.retryAfterSeconds))
+          .send({
+            error: {
+              code: 'RATE_LIMITED',
+              message: 'Too many verification attempts. Please try again later.'
+            }
+          });
+      }
+      return reply.code(status).send({ error: { code, message } });
+    };
+
     const userId = request.authUser!.id;
     if (!(await verifyPassword(db, userId, input.password))) {
-      return reply.code(401).send({
-        error: { code: 'INVALID_PASSWORD', message: 'Current password is incorrect.' }
-      });
+      return fail('INVALID_PASSWORD', 'Current password is incorrect.');
     }
     const user = await db.user.findUniqueOrThrow({ where: { id: userId } });
     if (user.mfaEnabled) {
       if (!input.code) {
-        return reply.code(401).send({
-          error: { code: 'MFA_REQUIRED', message: 'Authenticator code is required.' }
-        });
+        return fail('MFA_REQUIRED', 'Authenticator code is required.');
       }
       const mfa = await loadEnabledMfaSecret(db, config, userId);
       if (!mfa) {
-        return reply.code(400).send({
-          error: { code: 'MFA_DISABLED', message: 'Multi-factor authentication is not enabled.' }
-        });
+        return fail('MFA_DISABLED', 'Multi-factor authentication is not enabled.', 400);
       }
       const step = verifyTotpCode(
         mfa.secret,
@@ -544,9 +583,7 @@ export function registerMfaRoutes(app: FastifyInstance, db: PrismaClient, config
         mfa.user.mfaLastUsedStep
       );
       if (step === null) {
-        return reply.code(401).send({
-          error: { code: 'MFA_INVALID', message: 'Invalid authentication code.' }
-        });
+        return fail('MFA_INVALID', 'Invalid authentication code.');
       }
       await db.user.update({
         where: { id: userId },
@@ -558,11 +595,18 @@ export function registerMfaRoutes(app: FastifyInstance, db: PrismaClient, config
         error: { code: 'UNAUTHENTICATED', message: 'Authentication required' }
       });
     }
+    reauthLimiter.clear(sessionKey);
     const until = await markStrongReauth(
       db,
       request.authSessionId,
       MFA_STRONG_REAUTH_TTL_MS
     );
+    await writeAuthAudit(db, request.log, {
+      type: 'REAUTH_SUCCESS',
+      success: true,
+      request,
+      username: user.username
+    });
     return {
       stronglyAuthenticatedUntil: until,
       recentlyStronglyAuthenticated: await hasRecentStrongReauth(db, request.authSessionId)
