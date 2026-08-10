@@ -1,31 +1,91 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  * {
-    @apply border-slate-200;
+  :root {
+    --surface-page: #f4f6fa;
+    --surface-panel: #ffffff;
+    --surface-raised: #f8fafc;
+    --border-subtle: #e2e8f0;
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --accent: #2f6fed;
   }
+
+  html.dark {
+    --surface-page: #050816;
+    --surface-panel: #0b1020;
+    --surface-raised: #111827;
+    --border-subtle: rgba(148, 163, 184, 0.12);
+    --text-primary: #f1f5f9;
+    --text-secondary: #94a3b8;
+    --accent: #3b82f6;
+  }
+
+  * {
+    @apply border-slate-200 dark:border-white/10;
+  }
+
   html {
     color-scheme: light;
   }
+
   html.dark {
     color-scheme: dark;
   }
+
   body {
-    @apply m-0 min-w-[320px] bg-slate-50 font-sans antialiased dark:bg-slate-950;
+    @apply m-0 min-w-[320px] bg-console-50 font-sans text-slate-950 antialiased dark:bg-console-950 dark:text-slate-100;
   }
+
   button,
   input,
   select {
     font: inherit;
   }
+
   button {
     -webkit-tap-highlight-color: transparent;
   }
+
   ::selection {
     @apply bg-blue-200 text-blue-950 dark:bg-blue-800 dark:text-white;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-accent/60 ring-offset-2 ring-offset-[var(--surface-page)];
+  }
+}
+
+@layer components {
+  .ops-panel {
+    @apply rounded-xl border border-slate-200/90 bg-white dark:border-white/[0.07] dark:bg-console-850 dark:shadow-panel-dark;
+  }
+
+  .ops-eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400;
+  }
+
+  .ops-mono {
+    @apply font-mono text-[13px] tracking-tight;
+  }
+
+  .ops-divider {
+    @apply border-t border-slate-200/80 dark:border-white/[0.06];
+  }
+
+  .status-dot {
+    @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full;
+  }
+
+  .status-dot-live {
+    @apply status-dot bg-emerald-500;
+  }
+
+  .status-dot-live.animate {
+    @apply animate-status-pulse;
   }
 }
 
@@ -38,19 +98,23 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  .status-dot-live.animate {
+    animation: none !important;
+  }
 }
 
 .login-shell {
   background:
-    radial-gradient(circle at 18% 22%, rgba(37, 99, 235, 0.12), transparent 34%),
-    radial-gradient(circle at 82% 18%, rgba(14, 165, 233, 0.08), transparent 28%),
-    linear-gradient(160deg, #050913 0%, #07101d 48%, #050b16 100%);
+    radial-gradient(circle at 18% 22%, rgba(47, 111, 237, 0.1), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(14, 165, 233, 0.06), transparent 28%),
+    linear-gradient(160deg, #050816 0%, #070b17 48%, #050816 100%);
 }
 
 .login-grid {
   background-image:
-    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+    linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: radial-gradient(circle at center, black 35%, transparent 85%);
 }

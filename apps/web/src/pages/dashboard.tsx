@@ -1,6 +1,13 @@
-import { Copy, RefreshCw, Zap } from 'lucide-react';
+import { ArrowRight, RefreshCw, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { api, detectionStatusText, type Dashboard, type DetectionStatus } from '../api';
+import { Link } from 'react-router-dom';
+import {
+  api,
+  detectionStatusText,
+  type Dashboard,
+  type DetectionStatus,
+  type HistoryItem
+} from '../api';
 import {
   Badge,
   Button,
@@ -8,7 +15,9 @@ import {
   Dialog,
   ErrorState,
   Loading,
+  MaskedValue,
   PageTitle,
+  cx,
   formatDate,
   useToast
 } from '../components/ui';
@@ -19,6 +28,7 @@ export function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [action, setAction] = useState<'check' | 'force'>();
+
   const load = async () => {
     setLoading(true);
     try {
@@ -30,9 +40,11 @@ export function DashboardPage() {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     void load();
   }, []);
+
   const run = async () => {
     if (!action) return;
     try {
@@ -47,15 +59,22 @@ export function DashboardPage() {
       toast(caught instanceof Error ? caught.message : 'DDNS run failed', 'error');
     }
   };
+
   if (loading) return <Loading label="Loading DDNS dashboard" />;
   if (error || !data)
     return <ErrorState message={error || 'Dashboard unavailable'} retry={() => void load()} />;
+
+  const managed = data.totalRecords;
+  const proxied = data.proxiedRecords;
+  const dnsOnly = data.dnsOnlyRecords;
+  const proxyShare = managed > 0 ? Math.round((proxied / managed) * 100) : 0;
+
   return (
-    <div className="space-y-7">
+    <div className="space-y-5 sm:space-y-6">
       <PageTitle
         eyebrow="Overview"
         title="Dashboard"
-        description="Public addresses and DDNS health across all accounts and zones."
+        description="Network address detection, record coverage, and recent DDNS synchronization."
         actions={
           <>
             <Button variant="secondary" onClick={() => setAction('check')}>
@@ -69,59 +88,95 @@ export function DashboardPage() {
           </>
         }
       />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <IpCard family="IPv4" value={data.currentIp} status={data.ipv4Status} />
-        <IpCard family="IPv6" value={data.currentIpv6} status={data.ipv6Status} />
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <NetworkStatus data={data} />
+        <SystemHealth data={data} />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Metric label="Managed Records" value={data.totalRecords} note="All selected records" />
-        <Metric
-          label="Proxied Records"
-          value={data.proxiedRecords}
-          note="Cloudflare proxy enabled"
-        />
-        <Metric
-          label="DNS Only Records"
-          value={data.dnsOnlyRecords}
-          note="Origin IP is published"
-        />
-        <Metric label="A Records" value={data.aRecords} note="Managed IPv4 records" />
-        <Metric label="AAAA Records" value={data.aaaaRecords} note="Managed IPv6 records" />
+
+      <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
-          <span className="text-sm text-slate-500">Overall status</span>
-          <div className="mt-3">
-            <Badge status={data.status} />
+          <p className="ops-eyebrow">Record coverage</p>
+          <div className="mt-3 flex items-end gap-3">
+            <strong className="text-3xl font-semibold tracking-tight tabular-nums">
+              {managed}
+            </strong>
+            <span className="mb-1 text-sm text-slate-500">Managed records</span>
           </div>
-          <p className="mt-2 text-xs text-slate-500">Next check {formatDate(data.nextCheckAt)}</p>
+          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            <span className="text-slate-700 dark:text-slate-200">
+              <span className="font-semibold tabular-nums">{proxied}</span>{' '}
+              <span className="text-slate-500">Proxied</span>
+            </span>
+            <span className="text-slate-700 dark:text-slate-200">
+              <span className="font-semibold tabular-nums">{dnsOnly}</span>{' '}
+              <span className="text-slate-500">DNS only</span>
+            </span>
+          </div>
+          <div className="mt-4">
+            <div className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-[0.08em] text-slate-500">
+              <span>Proxy coverage</span>
+              <span className="tabular-nums">{proxyShare}%</span>
+            </div>
+            <div
+              className="h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10"
+              role="img"
+              aria-label={`${proxied} proxied, ${dnsOnly} DNS only`}
+            >
+              <div
+                className="h-full rounded-full bg-accent transition-[width] dark:bg-sky-400"
+                style={{ width: `${proxyShare}%` }}
+              />
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {proxied} proxied / {dnsOnly} DNS only
+            </p>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <p className="ops-eyebrow">Record types</p>
+          <div className="mt-4 space-y-3">
+            <TypeRow label="A" note="IPv4" value={data.aRecords} total={managed} />
+            <TypeRow label="AAAA" note="IPv6" value={data.aaaaRecords} total={managed} />
+          </div>
+          <div className="ops-divider mt-5 pt-4 text-xs text-slate-500">
+            {data.enabledRecords} of {managed} records currently enabled for DDNS
+          </div>
         </Card>
       </div>
+
       <Card>
-        <div className="border-b border-slate-200 p-5 dark:border-slate-800">
-          <h2 className="font-bold">Recent DDNS activity</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 px-5 py-4 dark:border-white/[0.06]">
+          <div>
+            <p className="ops-eyebrow">Live activity</p>
+            <h2 className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Recent DDNS events
+            </h2>
+          </div>
+          <Link
+            to="/history"
+            className="inline-flex items-center gap-1 text-[13px] font-medium text-accent hover:underline dark:text-sky-300"
+          >
+            View history
+            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+          </Link>
         </div>
         {!data.recentUpdates.length ? (
-          <p className="p-6 text-sm text-slate-500">No update history yet.</p>
+          <p className="px-5 py-8 text-sm text-slate-500">No update history yet.</p>
         ) : (
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {data.recentUpdates.map((item) => (
-              <div key={item.id} className="flex flex-wrap items-center gap-3 p-4">
-                <div className="min-w-0 flex-1">
-                  <strong className="block truncate text-sm">
-                    {item.recordName ?? item.action}
-                  </strong>
-                  <span className="text-xs text-slate-500">
-                    {item.oldValue && item.newValue
-                      ? `${item.oldValue} → ${item.newValue}`
-                      : item.message}
-                  </span>
-                </div>
-                <Badge status={item.status} />
-                <time className="text-xs text-slate-500">{formatDate(item.createdAt)}</time>
-              </div>
+          <ol className="relative px-5 py-2">
+            {data.recentUpdates.map((item, index) => (
+              <ActivityRow
+                key={item.id}
+                item={item}
+                last={index === data.recentUpdates.length - 1}
+              />
             ))}
-          </div>
+          </ol>
         )}
       </Card>
+
       <Dialog
         open={Boolean(action)}
         onClose={() => setAction(undefined)}
@@ -147,7 +202,84 @@ export function DashboardPage() {
   );
 }
 
-function IpCard({
+function NetworkStatus({ data }: { data: Dashboard }) {
+  const synced = data.status === 'healthy';
+  return (
+    <Card className="p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="ops-eyebrow">Network status</p>
+          <p className="mt-1 text-sm text-slate-500">Current network addresses</p>
+        </div>
+        <Badge status={synced ? 'healthy' : data.status}>
+          {synced ? 'Synchronized' : data.status}
+        </Badge>
+      </div>
+
+      <div className="mt-5 space-y-4">
+        <AddressRow family="IPv4" value={data.currentIp} status={data.ipv4Status} />
+        <div className="ops-divider" />
+        <AddressRow family="IPv6" value={data.currentIpv6} status={data.ipv6Status} />
+      </div>
+
+      <div className="ops-divider mt-5 flex flex-wrap items-center justify-between gap-2 pt-4 text-sm">
+        <span className="text-slate-500">Next automatic check</span>
+        <time className="ops-mono text-slate-800 dark:text-slate-100">
+          {formatDate(data.nextCheckAt)}
+        </time>
+      </div>
+    </Card>
+  );
+}
+
+function SystemHealth({ data }: { data: Dashboard }) {
+  const healthy = data.status === 'healthy';
+  return (
+    <Card className="flex flex-col p-5">
+      <p className="ops-eyebrow">System health</p>
+      <div className="mt-3 flex items-center gap-2.5">
+        <span
+          className={cx(
+            'status-dot h-2 w-2',
+            healthy ? 'status-dot-live animate' : data.status === 'error' ? 'bg-red-500' : 'bg-amber-500'
+          )}
+          aria-hidden
+        />
+        <strong className="text-base font-semibold tracking-tight">
+          {healthy
+            ? 'All systems operational'
+            : data.status === 'updating'
+              ? 'Synchronization in progress'
+              : data.status === 'degraded'
+                ? 'Attention required'
+                : data.status === 'error'
+                  ? 'System error'
+                  : 'Status unknown'}
+        </strong>
+      </div>
+      <p className="mt-2 text-sm text-slate-500">
+        Overall status: <span className="capitalize text-slate-700 dark:text-slate-300">{data.status}</span>
+      </p>
+
+      <div className="mt-auto grid gap-3 pt-6">
+        <div className="rounded-lg border border-slate-200/80 bg-slate-50/80 px-3.5 py-3 dark:border-white/[0.06] dark:bg-white/[0.03]">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500">Next DDNS check</p>
+          <p className="ops-mono mt-1 text-slate-900 dark:text-slate-100">
+            {formatDate(data.nextCheckAt)}
+          </p>
+        </div>
+        <div className="rounded-lg border border-slate-200/80 bg-slate-50/80 px-3.5 py-3 dark:border-white/[0.06] dark:bg-white/[0.03]">
+          <p className="text-[11px] uppercase tracking-[0.08em] text-slate-500">Managed coverage</p>
+          <p className="mt-1 text-sm font-medium tabular-nums text-slate-900 dark:text-slate-100">
+            {data.enabledRecords} / {data.totalRecords} records enabled
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function AddressRow({
   family,
   value,
   status
@@ -157,29 +289,105 @@ function IpCard({
   status?: DetectionStatus;
 }) {
   return (
-    <Card className="bg-gradient-to-br from-slate-950 to-blue-950 p-6 text-white">
-      <span className="text-sm text-blue-200">{detectionStatusText(status, family)}</span>
-      <div className="mt-2 flex items-center gap-2">
-        <strong className="break-all font-mono text-2xl">{value ?? '—'}</strong>
-        {value && (
-          <Button
-            variant="ghost"
-            aria-label={`Copy ${family}`}
-            onClick={() => void navigator.clipboard.writeText(value)}
-          >
-            <Copy className="h-4 w-4" />
-          </Button>
-        )}
+    <div className="grid gap-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:items-center sm:gap-4">
+      <span className="ops-mono text-[12px] font-medium text-slate-500">{family}</span>
+      <div className="min-w-0">
+        <MaskedValue value={value} label={family} />
+        <p className="mt-1 text-xs text-slate-500">{detectionStatusText(status, family)}</p>
       </div>
-    </Card>
+      <Badge status={status === 'DETECTED' ? 'healthy' : status === 'DISABLED' ? 'disabled' : 'warning'}>
+        {status === 'DETECTED' ? 'Detected' : status ? status.replaceAll('_', ' ').toLowerCase() : 'Unknown'}
+      </Badge>
+    </div>
   );
 }
-function Metric({ label, value, note }: { label: string; value: number; note: string }) {
+
+function TypeRow({
+  label,
+  note,
+  value,
+  total
+}: {
+  label: string;
+  note: string;
+  value: number;
+  total: number;
+}) {
+  const share = total > 0 ? Math.round((value / total) * 100) : 0;
   return (
-    <Card className="p-5">
-      <span className="text-sm text-slate-500">{label}</span>
-      <strong className="mt-2 block text-3xl">{value}</strong>
-      <span className="text-xs text-slate-500">{note}</span>
-    </Card>
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between gap-3">
+        <div className="flex items-baseline gap-2">
+          <span className="ops-mono text-sm font-semibold text-slate-900 dark:text-slate-50">
+            {label}
+          </span>
+          <span className="text-xs text-slate-500">{note}</span>
+        </div>
+        <span className="tabular-nums text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {value}
+        </span>
+      </div>
+      <div className="h-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10">
+        <div
+          className="h-full rounded-full bg-slate-500/70 dark:bg-slate-300/50"
+          style={{ width: `${share}%` }}
+        />
+      </div>
+    </div>
   );
+}
+
+function ActivityRow({ item, last }: { item: HistoryItem; last: boolean }) {
+  const detail =
+    item.oldValue && item.newValue
+      ? `${item.oldValue} → ${item.newValue}`
+      : item.message || activityDetail(item);
+
+  return (
+    <li className="relative flex gap-3 py-3.5">
+      <div className="relative flex w-3 shrink-0 justify-center">
+        <span
+          className={cx(
+            'relative z-[1] mt-1.5 status-dot',
+            item.status === 'success'
+              ? 'bg-emerald-500'
+              : item.status === 'failed'
+                ? 'bg-red-500'
+                : item.status === 'skipped'
+                  ? 'bg-slate-400'
+                  : 'bg-amber-500'
+          )}
+          aria-hidden
+        />
+        {!last && (
+          <span
+            className="absolute top-3 bottom-[-0.9rem] w-px bg-slate-200 dark:bg-white/10"
+            aria-hidden
+          />
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-50">
+              {item.recordName ?? item.action}
+            </p>
+            <p className="mt-0.5 truncate text-xs text-slate-500">{detail}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge status={item.status} />
+            <time className="ops-mono text-[11px] text-slate-500">{formatDate(item.createdAt)}</time>
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function activityDetail(item: HistoryItem) {
+  if (item.status === 'skipped') return 'No address change';
+  if (item.status === 'success' && item.action === 'update') return 'Address synchronized';
+  if (item.status === 'success' && item.action === 'check') return 'Record checked';
+  if (item.status === 'failed') return 'Update failed';
+  return item.action.replaceAll('-', ' ');
 }

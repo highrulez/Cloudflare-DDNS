@@ -28,6 +28,15 @@ const nav = [
   { to: '/settings', label: 'Settings', icon: Settings }
 ];
 
+function statusLabel(status: Dashboard['status'] | undefined) {
+  if (status === 'healthy') return 'Healthy';
+  if (status === 'updating') return 'Updating';
+  if (status === 'degraded') return 'Degraded';
+  if (status === 'error') return 'Error';
+  if (status === 'disabled') return 'Disabled';
+  return 'Checking';
+}
+
 export function AppShell() {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
@@ -37,22 +46,25 @@ export function AppShell() {
       localStorage.theme === 'dark' ||
       (!('theme' in localStorage) && matchMedia('(prefers-color-scheme: dark)').matches)
   );
-  const [summary, setSummary] = useState<Pick<Dashboard, 'currentIp' | 'status'>>();
+  const [summary, setSummary] = useState<Pick<Dashboard, 'status'>>();
   const menuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
     localStorage.theme = dark ? 'dark' : 'light';
   }, [dark]);
+
   useEffect(() => {
     const load = () =>
       api
         .dashboard()
-        .then(({ currentIp, status }) => setSummary({ currentIp, status }))
+        .then(({ status }) => setSummary({ status }))
         .catch(() => undefined);
     void load();
     const timer = window.setInterval(load, 60_000);
     return () => window.clearInterval(timer);
   }, []);
+
   useEffect(() => {
     const close = (event: MouseEvent) =>
       !menuRef.current?.contains(event.target as Node) && setMenu(false);
@@ -60,31 +72,38 @@ export function AppShell() {
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
+  const healthy = summary?.status === 'healthy';
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-50">
+    <div className="min-h-screen bg-console-50 text-slate-950 dark:bg-console-950 dark:text-slate-100">
       <aside
         className={cx(
-          'fixed inset-y-0 left-0 z-40 w-64 border-r border-slate-200 bg-slate-950 text-white transition-transform lg:translate-x-0 dark:border-slate-800',
+          'fixed inset-y-0 left-0 z-40 flex w-[15.5rem] flex-col border-r border-slate-200/80 bg-white transition-transform lg:translate-x-0 dark:border-white/[0.06] dark:bg-console-900',
           open ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-blue-500">
-            <Wifi className="h-5 w-5" />
+        <div className="flex h-14 items-center gap-3 border-b border-slate-200/80 px-4 dark:border-white/[0.06]">
+          <div className="grid h-8 w-8 place-items-center rounded-lg border border-accent/30 bg-accent/10 text-accent dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300">
+            <Wifi className="h-4 w-4" aria-hidden />
           </div>
-          <div>
-            <strong className="block text-sm">Cloudflare DDNS</strong>
-            <span className="text-xs text-slate-400">Manager</span>
+          <div className="min-w-0 leading-tight">
+            <strong className="block truncate text-[13px] font-semibold tracking-tight">
+              Cloudflare DDNS
+            </strong>
+            <span className="text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+              Manager
+            </span>
           </div>
           <button
-            className="ml-auto rounded-lg p-2 lg:hidden"
+            className="ml-auto rounded-md p-1.5 text-slate-500 hover:bg-slate-100 lg:hidden dark:hover:bg-white/5"
             aria-label="Close navigation"
             onClick={() => setOpen(false)}
           >
-            <X className="h-5 w-5" />
+            <X className="h-4 w-4" />
           </button>
         </div>
-        <nav className="space-y-1 p-3" aria-label="Primary navigation">
+
+        <nav className="flex-1 space-y-0.5 p-2.5" aria-label="Primary navigation">
           {nav.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
@@ -93,94 +112,127 @@ export function AppShell() {
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
                 cx(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition',
+                  'group relative flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition',
                   isActive
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-300 hover:bg-white/10 hover:text-white'
+                    ? 'bg-accent/10 text-slate-950 dark:bg-white/[0.06] dark:text-white'
+                    : 'text-slate-500 hover:bg-slate-100/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-slate-100'
                 )
               }
             >
-              <Icon className="h-[18px] w-[18px]" />
-              {label}
+              {({ isActive }) => (
+                <>
+                  <span
+                    className={cx(
+                      'absolute inset-y-1.5 left-0 w-0.5 rounded-full transition',
+                      isActive ? 'bg-accent dark:bg-sky-400' : 'bg-transparent'
+                    )}
+                    aria-hidden
+                  />
+                  <Icon
+                    className={cx(
+                      'h-4 w-4 shrink-0',
+                      isActive ? 'text-accent dark:text-sky-300' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300'
+                    )}
+                    aria-hidden
+                  />
+                  {label}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
-        <div className="absolute inset-x-3 bottom-4 rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-slate-400">
-          <span className="mb-1 block font-semibold text-slate-200">Service status</span>
-          <span className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            API connected
-          </span>
+
+        <div className="m-2.5 rounded-lg border border-slate-200/80 px-3 py-2.5 dark:border-white/[0.06]">
+          <p className="ops-eyebrow mb-1.5">System</p>
+          <p className="flex items-center gap-2 text-[12px] font-medium text-slate-700 dark:text-slate-200">
+            <span className="status-dot-live animate" aria-hidden />
+            Cloudflare connected
+          </p>
         </div>
       </aside>
+
       {open && (
         <button
-          className="fixed inset-0 z-30 bg-slate-950/50 lg:hidden"
+          className="fixed inset-0 z-30 bg-console-950/50 lg:hidden"
           aria-label="Close navigation overlay"
           onClick={() => setOpen(false)}
         />
       )}
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-6 dark:border-slate-800 dark:bg-slate-950/90">
+
+      <div className="lg:pl-[15.5rem]">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-slate-200/80 bg-console-50/90 px-3 backdrop-blur-md sm:gap-3 sm:px-5 dark:border-white/[0.06] dark:bg-console-950/90">
           <button
-            className="rounded-lg p-2 hover:bg-slate-100 lg:hidden dark:hover:bg-slate-800"
+            className="rounded-md p-2 text-slate-600 hover:bg-slate-200/60 lg:hidden dark:text-slate-300 dark:hover:bg-white/5"
             aria-label="Open navigation"
             onClick={() => setOpen(true)}
           >
             <Menu className="h-5 w-5" />
           </button>
-          <div className="ml-auto hidden items-center gap-3 sm:flex">
-            <div className="text-right">
-              <span className="block font-mono text-sm font-semibold">
-                {summary?.currentIp ?? 'Detecting IP…'}
-              </span>
-              <span className="text-xs text-slate-500">Current public IP</span>
+
+          <div className="hidden min-w-0 items-center gap-3 sm:flex">
+            <div className="min-w-0">
+              <p className="ops-eyebrow">DDNS</p>
+              <p className="flex items-center gap-2 text-[13px] font-medium text-slate-800 dark:text-slate-100">
+                <span
+                  className={cx(
+                    'status-dot',
+                    healthy ? 'status-dot-live animate' : summary?.status === 'error' ? 'bg-red-500' : 'bg-amber-500'
+                  )}
+                  aria-hidden
+                />
+                {statusLabel(summary?.status)}
+              </p>
             </div>
             <Badge status={summary?.status ?? 'updating'} />
           </div>
-          <button
-            onClick={() => setDark(!dark)}
-            aria-label={dark ? 'Use light theme' : 'Use dark theme'}
-            className="rounded-lg border border-slate-200 p-2 hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-          >
-            {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-          <div className="relative" ref={menuRef}>
+
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2">
             <button
-              className="flex items-center gap-2 rounded-lg p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800"
-              aria-haspopup="menu"
-              aria-expanded={menu}
-              onClick={() => setMenu(!menu)}
+              onClick={() => setDark(!dark)}
+              aria-label={dark ? 'Use light theme' : 'Use dark theme'}
+              className="rounded-md border border-slate-200/90 p-2 text-slate-600 hover:bg-white dark:border-white/10 dark:text-slate-300 dark:hover:bg-white/5"
             >
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-blue-100 text-sm font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                {user?.username?.[0]?.toUpperCase() ?? 'A'}
-              </span>
-              <span className="hidden max-w-32 truncate text-sm font-medium md:block">
-                {user?.username}
-              </span>
-              <ChevronDown className="h-4 w-4 text-slate-400" />
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
-            {menu && (
-              <div
-                role="menu"
-                className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+            <div className="relative" ref={menuRef}>
+              <button
+                className="flex items-center gap-2 rounded-md p-1.5 hover:bg-slate-200/50 dark:hover:bg-white/5"
+                aria-haspopup="menu"
+                aria-expanded={menu}
+                onClick={() => setMenu(!menu)}
               >
-                <div className="border-b border-slate-100 px-3 py-2 dark:border-slate-800">
-                  <strong className="block truncate text-sm">{user?.username}</strong>
-                </div>
-                <button
-                  role="menuitem"
-                  onClick={() => void logout()}
-                  className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+                <span className="grid h-7 w-7 place-items-center rounded-md border border-accent/20 bg-accent/10 text-[11px] font-bold text-accent dark:border-sky-400/20 dark:bg-sky-400/10 dark:text-sky-300">
+                  {user?.username?.[0]?.toUpperCase() ?? 'A'}
+                </span>
+                <span className="hidden max-w-28 truncate text-[13px] font-medium md:block">
+                  {user?.username}
+                </span>
+                <ChevronDown className="h-3.5 w-3.5 text-slate-400" aria-hidden />
+              </button>
+              {menu && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-1.5 shadow-panel dark:border-white/10 dark:bg-console-850 dark:shadow-panel-dark"
                 >
-                  <LogOut className="h-4 w-4" />
-                  Sign out
-                </button>
-              </div>
-            )}
+                  <div className="border-b border-slate-100 px-3 py-2 dark:border-white/[0.06]">
+                    <strong className="block truncate text-sm">{user?.username}</strong>
+                    <span className="text-[11px] text-slate-500">Signed in</span>
+                  </div>
+                  <button
+                    role="menuitem"
+                    onClick={() => void logout()}
+                    className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/40"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
-        <main className="mx-auto max-w-[1440px] p-4 sm:p-6 lg:p-8">
+
+        <main className="mx-auto max-w-[1280px] px-3 py-5 sm:px-5 sm:py-6 lg:px-8 lg:py-7">
           <Outlet />
         </main>
       </div>
