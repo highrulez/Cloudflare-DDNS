@@ -35,9 +35,18 @@ export function registerAuthRoutes(app: FastifyInstance, db: PrismaClient, confi
     return {
       siteKey: config.TURNSTILE_SITE_KEY,
       expectedHostname: config.TURNSTILE_EXPECTED_HOSTNAME,
-      expectedAction: config.TURNSTILE_EXPECTED_ACTION
+      expectedAction: config.TURNSTILE_EXPECTED_ACTION,
+      // Public canonical origin for Secure Access Required UI on unsupported hosts.
+      appOrigin: config.APP_ORIGIN ?? null
     };
   });
+
+  /** Minimal public bootstrap for LAN diagnostics UI (no secrets). */
+  app.get('/api/auth/bootstrap', () => ({
+    appOrigin: config.APP_ORIGIN ?? null,
+    turnstileExpectedHostname: config.TURNSTILE_EXPECTED_HOSTNAME,
+    secureLoginRequiredHint: true
+  }));
 
   app.post('/api/auth/login', async (request, reply) => {
     const input = loginSchema.parse(request.body);

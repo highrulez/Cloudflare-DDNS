@@ -443,7 +443,8 @@ describe('authentication security sprint', () => {
     expect(response.json()).toEqual({
       siteKey: TURNSTILE_TEST_SITE_KEY,
       expectedHostname: 'ddns.example.com',
-      expectedAction: 'login'
+      expectedAction: 'login',
+      appOrigin: 'https://ddns.example.com'
     });
     expect(JSON.stringify(response.json())).not.toContain(TURNSTILE_TEST_SECRET_KEY);
     await app.close();

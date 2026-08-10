@@ -354,9 +354,18 @@ export const api = {
   completeSetup: () => request<{ completed: boolean }>('/setup/complete', body('POST')),
   me: () => request<{ user: User }>('/auth/me'),
   turnstileConfig: () =>
-    request<{ siteKey: string; expectedHostname: string; expectedAction: string }>(
-      '/auth/turnstile'
-    ),
+    request<{
+      siteKey: string;
+      expectedHostname: string;
+      expectedAction: string;
+      appOrigin: string | null;
+    }>('/auth/turnstile'),
+  authBootstrap: () =>
+    request<{
+      appOrigin: string | null;
+      turnstileExpectedHostname: string;
+      secureLoginRequiredHint: boolean;
+    }>('/auth/bootstrap'),
   logout: () => request<void>('/auth/logout', body('POST')),
   dashboard: async (): Promise<Dashboard> => {
     const result = await request<{

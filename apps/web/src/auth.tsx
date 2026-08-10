@@ -21,7 +21,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .me()
       .then(({ user }) => setUser(user))
       .catch((error) => {
-        if (!(error instanceof ApiError) || error.status !== 401) console.error(error);
+        // Unauthenticated bootstrap is normal — render Login, never crash.
+        if (error instanceof ApiError && (error.status === 401 || error.status === 403)) return;
+        if (import.meta.env.DEV) console.error(error);
       })
       .finally(() => setLoading(false));
   }, []);

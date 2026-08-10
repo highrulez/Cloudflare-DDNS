@@ -43,8 +43,11 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [online, setOnline] = useState(true);
   const [siteKey, setSiteKey] = useState('');
+  const [expectedHostname, setExpectedHostname] = useState('');
+  const [appOrigin, setAppOrigin] = useState<string | null>(null);
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileReady, setTurnstileReady] = useState(false);
+  const [secureAccessOnly, setSecureAccessOnly] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
   const [recoveryCode, setRecoveryCode] = useState('');
   const usernameId = useId();
@@ -86,21 +89,50 @@ export function LoginPage() {
 
   useEffect(() => {
     let cancelled = false;
-    api
-      .turnstileConfig()
-      .then((config) => {
-        if (!cancelled) setSiteKey(config.siteKey);
-      })
-      .catch((caught: Error) => {
-        if (!cancelled) setError(caught.message || 'Security verification is unavailable');
-      });
+    const host = window.location.hostname;
+    const insecure = window.location.protocol !== 'https:';
+
+    void Promise.allSettled([api.turnstileConfig(), api.authBootstrap()]).then((results) => {
+      if (cancelled) return;
+      const turnstile =
+        results[0].status === 'fulfilled'
+          ? results[0].value
+          : null;
+      const bootstrap =
+        results[1].status === 'fulfilled'
+          ? results[1].value
+          : null;
+
+      const expected =
+        turnstile?.expectedHostname || bootstrap?.turnstileExpectedHostname || '';
+      const origin = turnstile?.appOrigin ?? bootstrap?.appOrigin ?? null;
+      setExpectedHostname(expected);
+      setAppOrigin(origin);
+
+      // Production Turnstile is bound to the canonical HTTPS hostname.
+      // Raw LAN HTTP is diagnostics-oriented — do not attempt login there.
+      const hostMismatch = Boolean(expected && host !== expected);
+      if (insecure || hostMismatch) {
+        setSecureAccessOnly(true);
+        setPhase('idle');
+        return;
+      }
+
+      if (turnstile?.siteKey) {
+        setSiteKey(turnstile.siteKey);
+      } else {
+        setSecureAccessOnly(true);
+        setError('Security verification is unavailable on this host.');
+      }
+    });
+
     return () => {
       cancelled = true;
     };
   }, []);
 
   useEffect(() => {
-    if (!siteKey || !widgetHostRef.current) return;
+    if (secureAccessOnly || !siteKey || !widgetHostRef.current) return;
 
     const mount = () => {
       if (!widgetHostRef.current || !window.turnstile || widgetIdRef.current) return;
@@ -162,7 +194,7 @@ export function LoginPage() {
         widgetIdRef.current = undefined;
       }
     };
-  }, [siteKey]);
+  }, [siteKey, secureAccessOnly]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -297,22 +329,26 @@ export function LoginPage() {
                 <Lock className="h-5 w-5" aria-hidden="true" />
               </div>
               <h2 className="mt-5 text-center text-xl font-bold uppercase tracking-[0.18em] text-white">
-                {onMfaStep
-                  ? phase === 'mfa-recovery'
-                    ? 'Recovery Access'
-                    : 'Security Verification'
-                  : 'Welcome Back'}
+                {secureAccessOnly
+                  ? 'Secure Access Required'
+                  : onMfaStep
+                    ? phase === 'mfa-recovery'
+                      ? 'Recovery Access'
+                      : 'Security Verification'
+                    : 'Welcome Back'}
               </h2>
               <div className="mx-auto mt-4 h-px w-10 bg-[#3b82f6]" aria-hidden="true" />
               <p className="mt-4 text-center text-sm text-slate-400">
-                {onMfaStep
-                  ? phase === 'mfa-recovery'
-                    ? 'Enter one of your saved recovery codes.'
-                    : 'Enter the 6-digit code from your authenticator app.'
-                  : 'Sign in to access your dashboard'}
+                {secureAccessOnly
+                  ? 'For security, administrator authentication is available through the configured HTTPS endpoint.'
+                  : onMfaStep
+                    ? phase === 'mfa-recovery'
+                      ? 'Enter one of your saved recovery codes.'
+                      : 'Enter the 6-digit code from your authenticator app.'
+                    : 'Sign in to access your dashboard'}
               </p>
 
-              {error && (
+              {error && !secureAccessOnly && (
                 <div
                   id={errorId}
                   role="alert"
@@ -325,7 +361,31 @@ export function LoginPage() {
                 </div>
               )}
 
-              {onMfaStep ? (
+              {secureAccessOnly ? (
+                <div className="mt-7 grid gap-5">
+                  <p className="rounded-xl border border-slate-700/80 bg-[#070d18] px-4 py-3 text-center text-sm leading-relaxed text-slate-400">
+                    Secure authentication requires HTTPS. Open the configured HTTPS application URL
+                    to sign in
+                    {expectedHostname ? ` (${expectedHostname})` : ''}.
+                  </p>
+                  {appOrigin ? (
+                    <a
+                      href={appOrigin}
+                      className="login-submit inline-flex h-12 w-full items-center justify-center gap-3 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#3b82f6] px-5 text-sm font-bold uppercase tracking-[0.16em] text-white shadow-[0_10px_30px_-16px_rgba(37,99,235,0.9)] transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
+                    >
+                      Open Secure Login
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </a>
+                  ) : (
+                    <p className="text-center font-mono text-[10px] uppercase tracking-[0.16em] text-slate-500">
+                      Configure APP_ORIGIN to enable the secure login link.
+                    </p>
+                  )}
+                  <p className="text-center font-mono text-[10px] uppercase tracking-[0.16em] text-slate-600">
+                    This LAN URL remains available for diagnostics and health checks.
+                  </p>
+                </div>
+              ) : onMfaStep ? (
                 <form
                   onSubmit={(event) => void submitMfa(event)}
                   className="mt-7 grid gap-5"

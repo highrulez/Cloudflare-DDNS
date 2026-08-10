@@ -108,8 +108,12 @@ Mutating browser requests must present an Origin that exactly matches an entry i
 open **System → Overview** and confirm HTTPS, original host, client IP, secure cookies, and
 trusted-proxy handling are healthy.
 
+docs/synology.md
+
 Direct LAN access at `http://192.0.2.10:8090` (your NAS IP) remains useful for diagnostics and
 health checks. Authenticated production administration should use the public HTTPS hostname.
+The login UI still loads over LAN HTTP, but authentication is directed to the HTTPS origin
+(Secure cookies + Turnstile hostname validation are not weakened for raw-IP access).
 
 Turnstile Siteverify expects your configured `TURNSTILE_EXPECTED_HOSTNAME` (example:
 `ddns.example.com`) and action `login`. Do not disable Turnstile, skip Siteverify, or set

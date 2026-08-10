@@ -36,6 +36,10 @@ export async function buildApp(
     requestTimeout: 30_000
   });
   await app.register(cookie);
+  // Restrictive CSP. Do NOT emit upgrade-insecure-requests on HTTP responses:
+  // production host-network LAN diagnostics (http://<lan-ip>:8090) would otherwise upgrade
+  // script/css/module/fetch to https://<lan-ip>:8090 (no TLS) and render a blank page.
+  // HTTPS responses still receive upgrade-insecure-requests (see onSend hook below).
   await app.register(helmet, {
     contentSecurityPolicy: {
       useDefaults: false,
@@ -50,13 +54,21 @@ export async function buildApp(
         styleSrc: ["'self'", 'https://fonts.googleapis.com'],
         scriptSrc: ["'self'", 'https://challenges.cloudflare.com'],
         frameSrc: ['https://challenges.cloudflare.com'],
-        connectSrc: ["'self'", 'https://challenges.cloudflare.com'],
-        upgradeInsecureRequests: config.NODE_ENV === 'production' ? [] : null
+        connectSrc: ["'self'", 'https://challenges.cloudflare.com']
       }
     },
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     xContentTypeOptions: true,
     xFrameOptions: { action: 'deny' }
+  });
+  app.addHook('onSend', async (request, reply, payload) => {
+    if (config.NODE_ENV === 'production' && request.protocol === 'https') {
+      const existing = reply.getHeader('content-security-policy');
+      if (typeof existing === 'string' && !existing.includes('upgrade-insecure-requests')) {
+        reply.header('content-security-policy', `${existing}; upgrade-insecure-requests`);
+      }
+    }
+    return payload;
   });
   registerSecurity(app, db, config);
 
