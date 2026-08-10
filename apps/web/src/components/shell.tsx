@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { api, type Dashboard } from '../api';
 import { useAuth } from '../auth';
-import { Badge, cx } from './ui';
+import { cx } from './ui';
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: Gauge },
@@ -28,13 +28,37 @@ const nav = [
   { to: '/settings', label: 'Settings', icon: Settings }
 ];
 
-function statusLabel(status: Dashboard['status'] | undefined) {
-  if (status === 'healthy') return 'Healthy';
-  if (status === 'updating') return 'Updating';
-  if (status === 'degraded') return 'Degraded';
-  if (status === 'error') return 'Error';
-  if (status === 'disabled') return 'Disabled';
-  return 'Checking';
+function networkGlobalState(status: Dashboard['status'] | undefined) {
+  if (status === 'error') {
+    return {
+      badge: 'Action required',
+      detail: 'Action required',
+      badgeClass: 'bg-red-500/10 text-red-700 dark:text-red-300',
+      dotClass: 'bg-red-500'
+    };
+  }
+  if (status === 'degraded' || status === 'updating' || status === 'disabled') {
+    return {
+      badge: 'Attention',
+      detail: 'Some issues detected',
+      badgeClass: 'bg-amber-500/10 text-amber-800 dark:text-amber-300',
+      dotClass: 'bg-amber-500'
+    };
+  }
+  if (status === 'healthy') {
+    return {
+      badge: 'Synchronized',
+      detail: 'All systems operational',
+      badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
+      dotClass: 'status-dot-live animate'
+    };
+  }
+  return {
+    badge: 'Checking',
+    detail: 'Status updating',
+    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-300',
+    dotClass: 'bg-slate-400'
+  };
 }
 
 export function AppShell() {
@@ -72,7 +96,7 @@ export function AppShell() {
     return () => document.removeEventListener('mousedown', close);
   }, []);
 
-  const healthy = summary?.status === 'healthy';
+  const network = networkGlobalState(summary?.status);
 
   return (
     <div className="min-h-screen bg-console-50 text-slate-950 dark:bg-console-950 dark:text-slate-100">
@@ -169,21 +193,22 @@ export function AppShell() {
             <Menu className="h-5 w-5" />
           </button>
 
-          <div className="hidden min-w-0 items-center gap-3 sm:flex">
-            <div className="min-w-0">
-              <p className="ops-eyebrow">DDNS</p>
-              <p className="flex items-center gap-2 text-[13px] font-medium text-slate-800 dark:text-slate-100">
-                <span
-                  className={cx(
-                    'status-dot',
-                    healthy ? 'status-dot-live animate' : summary?.status === 'error' ? 'bg-red-500' : 'bg-amber-500'
-                  )}
-                  aria-hidden
-                />
-                {statusLabel(summary?.status)}
-              </p>
+          <div className="hidden min-w-0 sm:block">
+            <div className="flex items-center gap-2">
+              <p className="ops-eyebrow">Network</p>
+              <span
+                className={cx(
+                  'inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em]',
+                  network.badgeClass
+                )}
+              >
+                {network.badge}
+              </span>
             </div>
-            <Badge status={summary?.status ?? 'updating'} />
+            <p className="mt-0.5 flex items-center gap-1.5 text-[12px] text-slate-500 dark:text-slate-400">
+              <span className={cx('status-dot', network.dotClass)} aria-hidden />
+              {network.detail}
+            </p>
           </div>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2">

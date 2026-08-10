@@ -67,7 +67,8 @@ export function DashboardPage() {
   const managed = data.totalRecords;
   const proxied = data.proxiedRecords;
   const dnsOnly = data.dnsOnlyRecords;
-  const proxyShare = managed > 0 ? Math.round((proxied / managed) * 100) : 0;
+  const proxiedPct = managed > 0 ? Math.round((proxied / managed) * 100) : 0;
+  const dnsOnlyPct = managed > 0 ? Math.max(0, 100 - proxiedPct) : 0;
 
   return (
     <div className="space-y-5 sm:space-y-6">
@@ -97,40 +98,62 @@ export function DashboardPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card className="p-5">
           <p className="ops-eyebrow">Record coverage</p>
-          <div className="mt-3 flex items-end gap-3">
-            <strong className="text-3xl font-semibold tracking-tight tabular-nums">
-              {managed}
-            </strong>
-            <span className="mb-1 text-sm text-slate-500">Managed records</span>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm">
-            <span className="text-slate-700 dark:text-slate-200">
-              <span className="font-semibold tabular-nums">{proxied}</span>{' '}
-              <span className="text-slate-500">Proxied</span>
-            </span>
-            <span className="text-slate-700 dark:text-slate-200">
-              <span className="font-semibold tabular-nums">{dnsOnly}</span>{' '}
-              <span className="text-slate-500">DNS only</span>
-            </span>
-          </div>
-          <div className="mt-4">
-            <div className="mb-1.5 flex items-center justify-between text-[11px] uppercase tracking-[0.08em] text-slate-500">
-              <span>Proxy coverage</span>
-              <span className="tabular-nums">{proxyShare}%</span>
+          <div className="mt-4 flex items-center gap-5">
+            <CoverageDonut proxied={proxied} dnsOnly={dnsOnly} />
+            <div className="min-w-0 flex-1">
+              <strong className="block text-3xl font-semibold tracking-tight tabular-nums">
+                {managed}
+              </strong>
+              <span className="text-sm text-slate-500">Managed records</span>
+              <ul className="mt-3 space-y-1.5 text-sm">
+                <li className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                    <span className="status-dot bg-teal-500" aria-hidden />
+                    Proxied
+                  </span>
+                  <span className="tabular-nums text-slate-800 dark:text-slate-100">
+                    {proxied}{' '}
+                    <span className="text-slate-500">({proxiedPct}%)</span>
+                  </span>
+                </li>
+                <li className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-2 text-slate-600 dark:text-slate-300">
+                    <span className="status-dot bg-accent dark:bg-sky-400" aria-hidden />
+                    DNS only
+                  </span>
+                  <span className="tabular-nums text-slate-800 dark:text-slate-100">
+                    {dnsOnly}{' '}
+                    <span className="text-slate-500">({dnsOnlyPct}%)</span>
+                  </span>
+                </li>
+              </ul>
             </div>
+          </div>
+          <div className="ops-divider mt-5 pt-4">
             <div
-              className="h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10"
+              className="flex h-1.5 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10"
               role="img"
-              aria-label={`${proxied} proxied, ${dnsOnly} DNS only`}
+              aria-label={`${proxied} proxied (${proxiedPct}%), ${dnsOnly} DNS only (${dnsOnlyPct}%)`}
             >
-              <div
-                className="h-full rounded-full bg-accent transition-[width] dark:bg-sky-400"
-                style={{ width: `${proxyShare}%` }}
-              />
+              {managed > 0 ? (
+                <>
+                  <div
+                    className="h-full bg-teal-500 transition-[width]"
+                    style={{ width: `${proxiedPct}%` }}
+                  />
+                  <div
+                    className="h-full bg-accent transition-[width] dark:bg-sky-400"
+                    style={{ width: `${dnsOnlyPct}%` }}
+                  />
+                </>
+              ) : null}
             </div>
-            <p className="mt-2 text-xs text-slate-500">
-              {proxied} proxied / {dnsOnly} DNS only
-            </p>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+              <span>
+                {proxied} proxied / {dnsOnly} DNS only
+              </span>
+              <span className="tabular-nums">{proxiedPct}% proxied</span>
+            </div>
           </div>
         </Card>
 
@@ -381,6 +404,66 @@ function ActivityRow({ item, last }: { item: HistoryItem; last: boolean }) {
         </div>
       </div>
     </li>
+  );
+}
+
+function CoverageDonut({ proxied, dnsOnly }: { proxied: number; dnsOnly: number }) {
+  const total = proxied + dnsOnly;
+  const size = 72;
+  const stroke = 8;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const proxiedLength = total > 0 ? (proxied / total) * circumference : 0;
+  const dnsOnlyLength = total > 0 ? (dnsOnly / total) * circumference : 0;
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="shrink-0 -rotate-90"
+      role="img"
+      aria-label={
+        total > 0
+          ? `${proxied} proxied, ${dnsOnly} DNS only`
+          : 'No managed records'
+      }
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth={stroke}
+        className="text-slate-200 dark:text-white/10"
+      />
+      {total > 0 && (
+        <>
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="#14b8a6"
+            strokeWidth={stroke}
+            strokeDasharray={`${proxiedLength} ${circumference - proxiedLength}`}
+            strokeLinecap="butt"
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="#2F6FED"
+            strokeWidth={stroke}
+            strokeDasharray={`${dnsOnlyLength} ${circumference - dnsOnlyLength}`}
+            strokeDashoffset={-proxiedLength}
+            strokeLinecap="butt"
+          />
+        </>
+      )}
+    </svg>
   );
 }
 
