@@ -9,7 +9,7 @@ import {
   type ReactNode
 } from 'react';
 import { api, ApiError } from '../api';
-import { Button, Dialog, Field } from './ui';
+import { Button, Dialog, Field, PasswordField } from './ui';
 
 type StrongAuthContextValue = {
   /** Run an API action; on STRONG_AUTH_REQUIRED open reauth modal and retry once. */
@@ -100,16 +100,19 @@ export function StrongAuthProvider({ children }: { children: ReactNode }) {
       <Dialog
         open={open}
         title="Security Verification"
-        description="This action requires additional verification."
+        description="Confirm your identity to continue."
         onClose={() => close(new Error('Security verification cancelled'))}
       >
-        <form onSubmit={(event) => void submit(event)} className="mt-4 grid gap-4">
+        <form onSubmit={(event) => void submit(event)} className="grid gap-4">
           {error && (
-            <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200">
+            <p
+              role="alert"
+              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
+            >
               {error}
             </p>
           )}
-          <Field label="Password" name="password" type="password" autoComplete="current-password" required />
+          <PasswordField label="Password" name="password" autoComplete="current-password" required />
           {mfaEnabled ? (
             <Field
               label="Authenticator code"
@@ -129,7 +132,7 @@ export function StrongAuthProvider({ children }: { children: ReactNode }) {
             >
               Cancel
             </Button>
-            <Button busy={busy}>Verify &amp; Continue</Button>
+            <Button busy={busy}>Verify</Button>
           </div>
         </form>
       </Dialog>

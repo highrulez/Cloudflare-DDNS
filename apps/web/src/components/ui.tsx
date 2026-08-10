@@ -92,6 +92,60 @@ export function Field({
   );
 }
 
+export function PasswordField({
+  label,
+  hint,
+  error,
+  className,
+  ...props
+}: Omit<InputHTMLAttributes<HTMLInputElement>, 'type'> & {
+  label: string;
+  hint?: string;
+  error?: string;
+}) {
+  const id = useId();
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="grid gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200">
+      <label htmlFor={id}>{label}</label>
+      <div className="relative">
+        <input
+          id={id}
+          type={visible ? 'text' : 'password'}
+          aria-invalid={!!error}
+          aria-describedby={hint || error ? `${id}-help` : undefined}
+          className={cx(
+            'h-11 w-full rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-10 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-white/10 dark:bg-console-950 dark:text-white',
+            error && 'border-red-500',
+            className
+          )}
+          {...props}
+        />
+        <button
+          type="button"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 dark:hover:bg-white/5 dark:hover:text-slate-200"
+          aria-label={visible ? `Hide ${label}` : `Show ${label}`}
+          title={visible ? `Hide ${label}` : `Show ${label}`}
+          onClick={() => setVisible((current) => !current)}
+        >
+          {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+      {(hint || error) && (
+        <span
+          id={`${id}-help`}
+          className={cx(
+            'text-xs font-normal',
+            error ? 'text-red-600 dark:text-red-400' : 'text-slate-500'
+          )}
+        >
+          {error ?? hint}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function SelectField({
   label,
   children,
