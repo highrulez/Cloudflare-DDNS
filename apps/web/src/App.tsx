@@ -4,7 +4,8 @@ import { useAuth } from './auth';
 import { RouteErrorBoundary } from './components/error-boundary';
 import { AppShell } from './components/shell';
 import { Loading } from './components/ui';
-import { HistoryPage, LoginPage, SettingsPage, SetupGuard } from './pages/core';
+import { LoginPage, SettingsPage, SetupGuard } from './pages/core';
+import { HistoryPage } from './pages/history';
 
 const CloudflarePage = lazy(() =>
   import('./pages/cloudflare').then((module) => ({ default: module.CloudflarePage }))

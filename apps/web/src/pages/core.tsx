@@ -1,11 +1,10 @@
-import { RefreshCw, Save } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { Save } from 'lucide-react';
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { api, type HistoryItem, type Settings } from '../api';
+import { api, type Settings } from '../api';
 import { useAuth } from '../auth';
 import { MfaSettingsCard } from '../components/mfa-settings';
 import {
-  Badge,
   Button,
   Card,
   ErrorState,
@@ -13,7 +12,6 @@ import {
   Loading,
   PageTitle,
   SelectField,
-  formatDate,
   useToast
 } from '../components/ui';
 
@@ -33,104 +31,6 @@ function useLoad<T>(loader: () => Promise<T>) {
   }, [loader]);
   useEffect(load, [load]);
   return { data, setData, loading, error, reload: load };
-}
-
-export function HistoryPage() {
-  const [page, setPage] = useState(1);
-  const [status, setStatus] = useState('');
-  const [record, setRecord] = useState('');
-  const query = useMemo(() => {
-    const value = new URLSearchParams({ page: String(page), pageSize: '20' });
-    if (status) value.set('status', status);
-    if (record) value.set('record', record);
-    return value;
-  }, [page, status, record]);
-  const load = useCallback(() => api.history(query), [query]);
-  const state = useLoad(load);
-  const pages = state.data ? Math.max(1, Math.ceil(state.data.total / state.data.pageSize)) : 1;
-  return (
-    <div className="space-y-7">
-      <PageTitle
-        eyebrow="Audit log"
-        title="Update History"
-        description="Checks, updates, creation, management changes, and Cloudflare deletion events."
-        actions={
-          <Button variant="secondary" onClick={state.reload}>
-            <RefreshCw className="h-4 w-4" />
-            Refresh
-          </Button>
-        }
-      />
-      <Card className="grid gap-4 p-4 sm:grid-cols-2">
-        <Field
-          label="Record"
-          value={record}
-          onChange={(event) => {
-            setRecord(event.target.value);
-            setPage(1);
-          }}
-        />
-        <SelectField
-          label="Result"
-          value={status}
-          onChange={(event) => {
-            setStatus(event.target.value);
-            setPage(1);
-          }}
-        >
-          <option value="">All results</option>
-          <option value="success">Success</option>
-          <option value="failed">Failed</option>
-          <option value="skipped">Skipped</option>
-        </SelectField>
-      </Card>
-      {state.loading ? (
-        <Loading label="Loading update history" />
-      ) : state.error ? (
-        <ErrorState message={state.error} retry={state.reload} />
-      ) : (
-        <Card>
-          <HistoryRows items={state.data?.items ?? []} />
-          <div className="flex items-center justify-between border-t border-slate-200 p-4 text-sm dark:border-slate-800">
-            <span>
-              {state.data?.total ?? 0} events · Page {page} of {pages}
-            </span>
-            <div className="flex gap-2">
-              <Button variant="secondary" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-                Previous
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={page >= pages}
-                onClick={() => setPage(page + 1)}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-    </div>
-  );
-}
-function HistoryRows({ items }: { items: HistoryItem[] }) {
-  if (!items.length) return <p className="p-6 text-sm text-slate-500">No matching events.</p>;
-  return (
-    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-      {items.map((item) => (
-        <div key={item.id} className="flex flex-wrap items-center gap-3 p-4">
-          <div className="min-w-0 flex-1">
-            <strong className="block truncate">{item.recordName ?? item.action}</strong>
-            <span className="text-xs text-slate-500">
-              {item.message ?? [item.oldValue, item.newValue].filter(Boolean).join(' → ')}
-            </span>
-          </div>
-          <Badge status={item.status} />
-          <time className="text-xs text-slate-500">{formatDate(item.createdAt)}</time>
-        </div>
-      ))}
-    </div>
-  );
 }
 
 const settingsLoad = () => api.settings();

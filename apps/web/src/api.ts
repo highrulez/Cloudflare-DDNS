@@ -99,12 +99,14 @@ export type HistoryItem = {
   id: string;
   recordName?: string;
   zoneName?: string;
+  recordType?: 'A' | 'AAAA';
   action:
     'check' | 'update' | 'force-update' | 'configuration' | 'create' | 'stop-managing' | 'delete';
   status: 'success' | 'failed' | 'skipped' | 'pending';
   oldValue?: string;
   newValue?: string;
   message?: string;
+  trigger?: 'SCHEDULED' | 'MANUAL_CHECK' | 'MANUAL_UPDATE' | 'FORCE' | 'SETUP';
   createdAt: string;
 };
 export type Settings = {
@@ -632,9 +634,13 @@ function mapRecord(value: Record<string, unknown>): RecordItem {
 function mapHistory(value: Record<string, unknown>): HistoryItem {
   const action = String(value.action ?? 'CHECKED');
   const result = String(value.result ?? 'SUCCESS');
+  const run = value.run as { trigger?: string } | undefined;
+  const trigger = run?.trigger;
+  const recordType = value.type === 'AAAA' ? 'AAAA' : value.type === 'A' ? 'A' : undefined;
   return {
     id: String(value.id),
     recordName: value.hostname ? String(value.hostname) : undefined,
+    recordType,
     action:
       action === 'UPDATED'
         ? 'update'
@@ -651,6 +657,14 @@ function mapHistory(value: Record<string, unknown>): HistoryItem {
     oldValue: value.previousIp ? String(value.previousIp) : undefined,
     newValue: value.newIp ? String(value.newIp) : undefined,
     message: value.error ? String(value.error) : undefined,
+    trigger:
+      trigger === 'SCHEDULED' ||
+      trigger === 'MANUAL_CHECK' ||
+      trigger === 'MANUAL_UPDATE' ||
+      trigger === 'FORCE' ||
+      trigger === 'SETUP'
+        ? trigger
+        : undefined,
     createdAt: String(value.createdAt ?? new Date().toISOString())
   };
 }
