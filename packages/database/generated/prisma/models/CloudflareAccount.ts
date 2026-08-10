@@ -507,10 +507,6 @@ export type CloudflareAccountScalarRelationFilter = {
   isNot?: Prisma.CloudflareAccountWhereInput
 }
 
-export type BytesFieldUpdateOperationsInput = {
-  set?: runtime.Bytes
-}
-
 export type CloudflareAccountCreateNestedOneWithoutZonesInput = {
   create?: Prisma.XOR<Prisma.CloudflareAccountCreateWithoutZonesInput, Prisma.CloudflareAccountUncheckedCreateWithoutZonesInput>
   connectOrCreate?: Prisma.CloudflareAccountCreateOrConnectWithoutZonesInput

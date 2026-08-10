@@ -14,6 +14,7 @@ import {
   setSessionCookie
 } from '../security/sessions.js';
 import { TurnstileError, verifyTurnstileToken } from '../security/turnstile.js';
+import { createMfaLoginChallenge } from './mfa.js';
 
 // Precomputed Argon2id hash used only to equalize timing when the username is unknown.
 const UNKNOWN_USER_HASH =
@@ -126,6 +127,12 @@ export function registerAuthRoutes(app: FastifyInstance, db: PrismaClient, confi
     }
 
     limiter.clear(ipKey);
+
+    if (user.mfaEnabled) {
+      const challenge = await createMfaLoginChallenge(db, config, reply, request, user.id);
+      return challenge;
+    }
+
     const session = await rotateSession(db, config, request, user.id);
     setSessionCookie(reply, config, session.token, session.expiresAt, request);
     await writeAuthAudit(db, request.log, {

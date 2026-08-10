@@ -8,6 +8,7 @@ import { sessionHash } from './crypto.js';
 declare module 'fastify' {
   interface FastifyRequest {
     authUser: { id: string; username: string } | null;
+    authSessionId: string | null;
   }
 }
 
@@ -76,8 +77,67 @@ export function clearSessionCookie(
   });
 }
 
+export function setMfaChallengeCookie(
+  reply: FastifyReply,
+  config: Config,
+  token: string,
+  expiresAt: Date,
+  request: FastifyRequest,
+  cookieName: string
+) {
+  reply.setCookie(cookieName, token, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: sessionCookieSecure(request, config),
+    expires: expiresAt
+  });
+}
+
+export function clearMfaChallengeCookie(
+  reply: FastifyReply,
+  config: Config,
+  request: FastifyRequest,
+  cookieName: string
+) {
+  reply.clearCookie(cookieName, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: sessionCookieSecure(request, config)
+  });
+}
+
+export async function markStrongReauth(
+  db: PrismaClient,
+  sessionId: string,
+  ttlMs: number
+) {
+  const until = new Date(Date.now() + ttlMs);
+  await db.session.update({
+    where: { id: sessionId },
+    data: { stronglyAuthenticatedUntil: until }
+  });
+  return until;
+}
+
+export async function hasRecentStrongReauth(
+  db: PrismaClient,
+  sessionId: string | null | undefined
+): Promise<boolean> {
+  if (!sessionId) return false;
+  const session = await db.session.findUnique({
+    where: { id: sessionId },
+    select: { stronglyAuthenticatedUntil: true }
+  });
+  return Boolean(
+    session?.stronglyAuthenticatedUntil && session.stronglyAuthenticatedUntil > new Date()
+  );
+}
+
 export function registerSecurity(app: FastifyInstance, db: PrismaClient, config: Config) {
   app.decorateRequest('authUser', null);
+  app.decorateRequest('authSessionId', null);
   app.addHook('onRequest', async (request, reply) => {
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
       const origin = request.headers.origin;
@@ -115,6 +175,7 @@ export function registerSecurity(app: FastifyInstance, db: PrismaClient, config:
       return;
     }
     request.authUser = session.user;
+    request.authSessionId = session.id;
     if (session.expiresAt.getTime() - now.getTime() < config.SESSION_TTL_SECONDS * 500) {
       const expiresAt = new Date(now.getTime() + config.SESSION_TTL_SECONDS * 1_000);
       await db.session.update({ where: { id: session.id }, data: { expiresAt, lastSeenAt: now } });

@@ -23,6 +23,21 @@ export * from './enums.js';
  */
 export type User = Prisma.UserModel
 /**
+ * Model MfaRecoveryCode
+ * 
+ */
+export type MfaRecoveryCode = Prisma.MfaRecoveryCodeModel
+/**
+ * Model MfaChallenge
+ * 
+ */
+export type MfaChallenge = Prisma.MfaChallengeModel
+/**
+ * Model MfaEnrollment
+ * 
+ */
+export type MfaEnrollment = Prisma.MfaEnrollmentModel
+/**
  * Model AuthAuditEvent
  * 
  */

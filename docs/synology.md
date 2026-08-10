@@ -133,8 +133,8 @@ TURNSTILE_EXPECTED_ACTION=login
 ```
 
 4. Redeploy the app container so Compose injects the Turnstile env vars.
-5. Apply pending MariaDB migrations (including authentication audit events) via the normal
-   deploy/migrate path before relying on audit persistence.
+5. Apply pending MariaDB migrations (including authentication audit events and MFA tables) via the
+   normal deploy/migrate path before relying on audit persistence or MFA.
 
 To include release metadata in the System page, set these values before rebuilding:
 

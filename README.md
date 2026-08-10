@@ -18,6 +18,7 @@ and records every result in MariaDB.
   self-tests, and sanitized in-memory logs
 - Local Argon2 administrator login with MariaDB-backed HttpOnly sessions
 - Cloudflare Turnstile on login, login rate limiting, session hardening, and authentication audit events
+- Optional TOTP multi-factor authentication with QR enrollment and one-time recovery codes
 - Responsive React dashboard
 
 ## Requirements
@@ -150,6 +151,23 @@ for raw LAN IP access.
 
 Automated/local tests should use Cloudflare’s official Turnstile test keys. Never call your
 production Turnstile secret from CI.
+
+## Multi-factor authentication (TOTP)
+
+After Turnstile + password, accounts with MFA enabled must complete a short-lived MFA challenge
+using a standard authenticator app (Microsoft Authenticator, Google Authenticator, 1Password,
+Bitwarden, Authy, and other RFC-compatible TOTP apps) or a one-time recovery code.
+
+Enable MFA from **Settings → Multi-factor authentication**:
+
+1. Confirm your current password.
+2. Scan the QR code (or reveal/copy the setup key).
+3. Confirm with a 6-digit TOTP code.
+4. Save the recovery codes shown once (copy or download `.txt` client-side).
+
+There is no email or SMS recovery path. If you lose both the authenticator and all recovery codes,
+there is no web-based bypass—restore access only through a controlled self-hosted recovery procedure
+on the server.
 
 ## Cloudflare API token
 

@@ -353,11 +353,6 @@ export const api = {
     ),
   completeSetup: () => request<{ completed: boolean }>('/setup/complete', body('POST')),
   me: () => request<{ user: User }>('/auth/me'),
-  login: (username: string, password: string, turnstileToken: string) =>
-    request<{ user: User }>(
-      '/auth/login',
-      body('POST', { username, password, turnstileToken })
-    ),
   turnstileConfig: () =>
     request<{ siteKey: string; expectedHostname: string; expectedAction: string }>(
       '/auth/turnstile'
@@ -509,6 +504,45 @@ export const api = {
     request<{ user: User }>('/auth/profile', body('PATCH', data)),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     request<void>('/auth/password', body('PUT', data)),
+  login: async (username: string, password: string, turnstileToken: string) => {
+    const result = await request<{ user?: User; mfaRequired?: boolean }>(
+      '/auth/login',
+      body('POST', { username, password, turnstileToken })
+    );
+    if (result.mfaRequired) return { mfaRequired: true as const };
+    if (!result.user) throw new ApiError('Login response was incomplete', 500);
+    return { mfaRequired: false as const, user: result.user };
+  },
+  verifyMfa: (data: { code?: string; recoveryCode?: string }) =>
+    request<{ user: User; recoveryCodeUsed?: boolean }>('/auth/mfa/verify', body('POST', data)),
+  mfaStatus: () =>
+    request<{
+      enabled: boolean;
+      enabledAt: string | null;
+      recoveryCodesRemaining: number;
+      recoveryCodesTotal: number;
+    }>('/auth/mfa/status'),
+  mfaEnrollStart: (password: string) =>
+    request<{
+      otpauthUrl: string;
+      qrDataUrl: string;
+      setupKey: string;
+      expiresAt: string;
+    }>('/auth/mfa/enroll/start', body('POST', { password })),
+  mfaEnrollConfirm: (code: string) =>
+    request<{ enabled: boolean; recoveryCodes: string[] }>(
+      '/auth/mfa/enroll/confirm',
+      body('POST', { code })
+    ),
+  mfaRegenerateRecovery: (data: { password: string; code: string }) =>
+    request<{ recoveryCodes: string[] }>('/auth/mfa/recovery/regenerate', body('POST', data)),
+  mfaDisable: (data: { password: string; code: string }) =>
+    request<void>('/auth/mfa/disable', body('POST', data)),
+  reauth: (data: { password: string; code?: string }) =>
+    request<{ stronglyAuthenticatedUntil: string; recentlyStronglyAuthenticated: boolean }>(
+      '/auth/reauth',
+      body('POST', data)
+    ),
   systemOverview: () => request<SystemOverview>('/system/overview'),
   refreshSystemNetwork: () => request<PublicIp>('/system/network/refresh', body('POST')),
   runSystemTests: () =>

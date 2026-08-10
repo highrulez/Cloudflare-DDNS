@@ -12,6 +12,7 @@ import { Scheduler } from './ddns/scheduler.js';
 import { RequestError } from './records/service.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerCloudflareRoutes } from './routes/cloudflare.js';
+import { registerMfaRoutes } from './routes/mfa.js';
 import { registerOperationRoutes } from './routes/operations.js';
 import { registerRecordRoutes } from './routes/records.js';
 import { registerSetupRoutes } from './routes/setup.js';
@@ -63,6 +64,7 @@ export async function buildApp(
   const scheduler = new Scheduler(db, engine);
   registerSetupRoutes(app, db, config);
   registerAuthRoutes(app, db, config);
+  registerMfaRoutes(app, db, config);
   registerCloudflareRoutes(app, db, config);
   registerRecordRoutes(app, db, config, engine, scheduler);
   registerOperationRoutes(app, db, config, engine, scheduler);

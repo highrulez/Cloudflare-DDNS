@@ -17,7 +17,13 @@ import { useAuth } from '../auth';
 import { Loading, cx } from '../components/ui';
 import { APP_VERSION } from '../version';
 
-type AuthPhase = 'idle' | 'verifying' | 'authenticating' | 'authenticated';
+type AuthPhase =
+  | 'idle'
+  | 'verifying'
+  | 'authenticating'
+  | 'mfa'
+  | 'mfa-recovery'
+  | 'authenticated';
 
 declare global {
   interface Window {
@@ -31,7 +37,7 @@ declare global {
 }
 
 export function LoginPage() {
-  const { user, loading, login } = useAuth();
+  const { user, loading, login, verifyMfa } = useAuth();
   const [show, setShow] = useState(false);
   const [phase, setPhase] = useState<AuthPhase>('idle');
   const [error, setError] = useState('');
@@ -39,9 +45,13 @@ export function LoginPage() {
   const [siteKey, setSiteKey] = useState('');
   const [turnstileToken, setTurnstileToken] = useState('');
   const [turnstileReady, setTurnstileReady] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const [recoveryCode, setRecoveryCode] = useState('');
   const usernameId = useId();
   const passwordId = useId();
   const errorId = useId();
+  const mfaCodeId = useId();
+  const recoveryId = useId();
   const widgetHostRef = useRef<HTMLDivElement>(null);
   const widgetIdRef = useRef<string>();
 
@@ -51,6 +61,14 @@ export function LoginPage() {
       window.turnstile.reset(widgetIdRef.current);
     }
   }, []);
+
+  const backToSignIn = () => {
+    setPhase('idle');
+    setError('');
+    setMfaCode('');
+    setRecoveryCode('');
+    resetTurnstile();
+  };
 
   useEffect(() => {
     let active = true;
@@ -156,16 +174,45 @@ export function LoginPage() {
     setError('');
     const form = new FormData(event.currentTarget);
     try {
-      await login(
+      const result = await login(
         String(form.get('username') ?? ''),
         String(form.get('password') ?? ''),
         turnstileToken
       );
+      if (result.mfaRequired) {
+        setPhase('mfa');
+        setMfaCode('');
+        return;
+      }
       setPhase('authenticated');
     } catch (caught) {
       setPhase('idle');
       setError(caught instanceof Error ? caught.message : 'Sign in failed');
       resetTurnstile();
+    }
+  };
+
+  const submitMfa = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPhase((current) => (current === 'mfa-recovery' ? 'mfa-recovery' : 'mfa'));
+    setError('');
+    try {
+      if (phase === 'mfa-recovery') {
+        await verifyMfa({ recoveryCode: recoveryCode.trim() });
+      } else {
+        await verifyMfa({ code: mfaCode.replace(/\s+/g, '') });
+      }
+      setPhase('authenticated');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Verification failed');
+      setMfaCode('');
+      setRecoveryCode('');
+      if (
+        caught instanceof Error &&
+        /expired|sign in again|too many failed/i.test(caught.message)
+      ) {
+        backToSignIn();
+      }
     }
   };
 
@@ -178,12 +225,14 @@ export function LoginPage() {
   if (user) return <Navigate to="/" replace />;
 
   const busy = phase === 'authenticating' || phase === 'authenticated';
+  const mfaBusy = phase === 'authenticated';
   const buttonLabel =
     phase === 'authenticating'
       ? 'Authenticating...'
       : phase === 'authenticated'
         ? 'Authenticated'
         : 'Sign In';
+  const onMfaStep = phase === 'mfa' || phase === 'mfa-recovery';
 
   return (
     <div className="login-shell relative min-h-screen overflow-hidden text-slate-100">
@@ -248,11 +297,19 @@ export function LoginPage() {
                 <Lock className="h-5 w-5" aria-hidden="true" />
               </div>
               <h2 className="mt-5 text-center text-xl font-bold uppercase tracking-[0.18em] text-white">
-                Welcome Back
+                {onMfaStep
+                  ? phase === 'mfa-recovery'
+                    ? 'Recovery Access'
+                    : 'Security Verification'
+                  : 'Welcome Back'}
               </h2>
               <div className="mx-auto mt-4 h-px w-10 bg-[#3b82f6]" aria-hidden="true" />
               <p className="mt-4 text-center text-sm text-slate-400">
-                Sign in to access your dashboard
+                {onMfaStep
+                  ? phase === 'mfa-recovery'
+                    ? 'Enter one of your saved recovery codes.'
+                    : 'Enter the 6-digit code from your authenticator app.'
+                  : 'Sign in to access your dashboard'}
               </p>
 
               {error && (
@@ -268,86 +325,178 @@ export function LoginPage() {
                 </div>
               )}
 
-              <form
-                onSubmit={(event) => void submit(event)}
-                className="mt-7 grid gap-5"
-                aria-describedby={error ? errorId : undefined}
-              >
-                <label htmlFor={usernameId} className="grid gap-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Username
-                  </span>
-                  <span className="relative block">
-                    <User
-                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
-                      aria-hidden="true"
-                    />
-                    <input
-                      id={usernameId}
-                      name="username"
-                      type="text"
-                      autoComplete="username"
-                      required
-                      disabled={busy}
-                      placeholder="Enter your username"
-                      className="login-input h-12 w-full rounded-lg border border-slate-700 bg-[#070d18] py-2 pl-10 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/20 disabled:opacity-60"
-                    />
-                  </span>
-                </label>
+              {onMfaStep ? (
+                <form
+                  onSubmit={(event) => void submitMfa(event)}
+                  className="mt-7 grid gap-5"
+                  aria-describedby={error ? errorId : undefined}
+                >
+                  {phase === 'mfa' ? (
+                    <label htmlFor={mfaCodeId} className="grid gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Authenticator code
+                      </span>
+                      <input
+                        id={mfaCodeId}
+                        name="mfaCode"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        pattern="[0-9]{6}"
+                        maxLength={6}
+                        required
+                        disabled={mfaBusy}
+                        value={mfaCode}
+                        onChange={(event) =>
+                          setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))
+                        }
+                        placeholder="••••••"
+                        className="login-input h-12 w-full rounded-lg border border-slate-700 bg-[#070d18] px-3 text-center font-mono text-lg tracking-[0.35em] text-slate-100 outline-none transition placeholder:tracking-[0.35em] placeholder:text-slate-600 focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/20 disabled:opacity-60"
+                      />
+                    </label>
+                  ) : (
+                    <label htmlFor={recoveryId} className="grid gap-2">
+                      <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        Recovery code
+                      </span>
+                      <input
+                        id={recoveryId}
+                        name="recoveryCode"
+                        autoComplete="off"
+                        required
+                        disabled={mfaBusy}
+                        value={recoveryCode}
+                        onChange={(event) => setRecoveryCode(event.target.value.toUpperCase())}
+                        placeholder="XXXX-XXXX-XXXX"
+                        className="login-input h-12 w-full rounded-lg border border-slate-700 bg-[#070d18] px-3 font-mono text-sm tracking-[0.12em] text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/20 disabled:opacity-60"
+                      />
+                    </label>
+                  )}
 
-                <label htmlFor={passwordId} className="grid gap-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    Password
-                  </span>
-                  <span className="relative block">
-                    <Lock
-                      className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
-                      aria-hidden="true"
-                    />
-                    <input
-                      id={passwordId}
-                      name="password"
-                      type={show ? 'text' : 'password'}
-                      autoComplete="current-password"
-                      required
-                      disabled={busy}
-                      placeholder="Enter your password"
-                      className="login-input h-12 w-full rounded-lg border border-slate-700 bg-[#070d18] py-2 pl-10 pr-12 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/20 disabled:opacity-60"
-                    />
+                  <button
+                    type="submit"
+                    disabled={mfaBusy || (phase === 'mfa' ? mfaCode.length !== 6 : !recoveryCode)}
+                    className="login-submit mt-1 inline-flex h-12 w-full items-center justify-center gap-3 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#3b82f6] px-5 text-sm font-bold uppercase tracking-[0.16em] text-white shadow-[0_10px_30px_-16px_rgba(37,99,235,0.9)] transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1220] disabled:cursor-wait disabled:opacity-80"
+                  >
+                    {phase === 'mfa-recovery' ? 'Verify Recovery Code' : 'Verify'}
+                  </button>
+
+                  <div className="grid gap-2 text-center">
+                    {phase === 'mfa' ? (
+                      <button
+                        type="button"
+                        className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400 transition hover:text-[#60a5fa]"
+                        onClick={() => {
+                          setPhase('mfa-recovery');
+                          setError('');
+                          setRecoveryCode('');
+                        }}
+                      >
+                        Use a recovery code
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="text-xs font-medium uppercase tracking-[0.14em] text-slate-400 transition hover:text-[#60a5fa]"
+                        onClick={() => {
+                          setPhase('mfa');
+                          setError('');
+                          setMfaCode('');
+                        }}
+                      >
+                        Use authenticator code
+                      </button>
+                    )}
                     <button
                       type="button"
-                      aria-label={show ? 'Hide password' : 'Show password'}
-                      onClick={() => setShow(!show)}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-slate-500 transition hover:bg-white/5 hover:text-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]"
+                      className="text-xs font-medium uppercase tracking-[0.14em] text-slate-500 transition hover:text-slate-300"
+                      onClick={backToSignIn}
                     >
-                      {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      ← Back to sign in
                     </button>
-                  </span>
-                </label>
-
-                <div className="grid gap-2">
-                  {(phase === 'verifying' || (!turnstileToken && turnstileReady)) && (
-                    <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">
-                      Verifying secure connection...
-                    </p>
-                  )}
-                  <div ref={widgetHostRef} className="min-h-[65px]" />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={busy || !turnstileToken}
-                  className="login-submit mt-1 inline-flex h-12 w-full items-center justify-center gap-3 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#3b82f6] px-5 text-sm font-bold uppercase tracking-[0.16em] text-white shadow-[0_10px_30px_-16px_rgba(37,99,235,0.9)] transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1220] active:translate-y-px active:brightness-95 disabled:cursor-wait disabled:opacity-80"
+                  </div>
+                </form>
+              ) : (
+                <form
+                  onSubmit={(event) => void submit(event)}
+                  className="mt-7 grid gap-5"
+                  aria-describedby={error ? errorId : undefined}
                 >
-                  {phase === 'authenticating' && (
-                    <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-                  )}
-                  <span>{buttonLabel}</span>
-                  {phase === 'idle' && (
-                    <ArrowRight className="ml-auto h-4 w-4" aria-hidden="true" />
-                  )}
-                </button>
-              </form>
+                  <label htmlFor={usernameId} className="grid gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Username
+                    </span>
+                    <span className="relative block">
+                      <User
+                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+                        aria-hidden="true"
+                      />
+                      <input
+                        id={usernameId}
+                        name="username"
+                        type="text"
+                        autoComplete="username"
+                        required
+                        disabled={busy}
+                        placeholder="Enter your username"
+                        className="login-input h-12 w-full rounded-lg border border-slate-700 bg-[#070d18] py-2 pl-10 pr-3 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/20 disabled:opacity-60"
+                      />
+                    </span>
+                  </label>
+
+                  <label htmlFor={passwordId} className="grid gap-2">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Password
+                    </span>
+                    <span className="relative block">
+                      <Lock
+                        className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+                        aria-hidden="true"
+                      />
+                      <input
+                        id={passwordId}
+                        name="password"
+                        type={show ? 'text' : 'password'}
+                        autoComplete="current-password"
+                        required
+                        disabled={busy}
+                        placeholder="Enter your password"
+                        className="login-input h-12 w-full rounded-lg border border-slate-700 bg-[#070d18] py-2 pl-10 pr-12 text-sm text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-[#3b82f6] focus:ring-2 focus:ring-[#3b82f6]/20 disabled:opacity-60"
+                      />
+                      <button
+                        type="button"
+                        aria-label={show ? 'Hide password' : 'Show password'}
+                        onClick={() => setShow(!show)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-2 text-slate-500 transition hover:bg-white/5 hover:text-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#3b82f6]"
+                      >
+                        {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </span>
+                  </label>
+
+                  <div className="grid gap-2">
+                    {(phase === 'verifying' || (!turnstileToken && turnstileReady)) && (
+                      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                        Verifying secure connection...
+                      </p>
+                    )}
+                    <div ref={widgetHostRef} className="min-h-[65px]" />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={busy || !turnstileToken}
+                    className="login-submit mt-1 inline-flex h-12 w-full items-center justify-center gap-3 rounded-lg bg-gradient-to-r from-[#2563eb] to-[#3b82f6] px-5 text-sm font-bold uppercase tracking-[0.16em] text-white shadow-[0_10px_30px_-16px_rgba(37,99,235,0.9)] transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b1220] active:translate-y-px active:brightness-95 disabled:cursor-wait disabled:opacity-80"
+                  >
+                    {phase === 'authenticating' && (
+                      <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    )}
+                    <span>{buttonLabel}</span>
+                    {phase === 'idle' && (
+                      <ArrowRight className="ml-auto h-4 w-4" aria-hidden="true" />
+                    )}
+                  </button>
+                </form>
+              )}
             </div>
           </section>
         </div>

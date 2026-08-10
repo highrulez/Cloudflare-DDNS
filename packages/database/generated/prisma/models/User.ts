@@ -20,14 +20,33 @@ export type UserModel = runtime.Types.Result.DefaultSelection<Prisma.$UserPayloa
 
 export type AggregateUser = {
   _count: UserCountAggregateOutputType | null
+  _avg: UserAvgAggregateOutputType | null
+  _sum: UserSumAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
   _max: UserMaxAggregateOutputType | null
+}
+
+export type UserAvgAggregateOutputType = {
+  mfaSecretKeyVersion: number | null
+  mfaLastUsedStep: number | null
+}
+
+export type UserSumAggregateOutputType = {
+  mfaSecretKeyVersion: number | null
+  mfaLastUsedStep: bigint | null
 }
 
 export type UserMinAggregateOutputType = {
   id: string | null
   username: string | null
   passwordHash: string | null
+  mfaEnabled: boolean | null
+  mfaSecretCiphertext: runtime.Bytes | null
+  mfaSecretIv: runtime.Bytes | null
+  mfaSecretAuthTag: runtime.Bytes | null
+  mfaSecretKeyVersion: number | null
+  mfaEnabledAt: Date | null
+  mfaLastUsedStep: bigint | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -36,6 +55,13 @@ export type UserMaxAggregateOutputType = {
   id: string | null
   username: string | null
   passwordHash: string | null
+  mfaEnabled: boolean | null
+  mfaSecretCiphertext: runtime.Bytes | null
+  mfaSecretIv: runtime.Bytes | null
+  mfaSecretAuthTag: runtime.Bytes | null
+  mfaSecretKeyVersion: number | null
+  mfaEnabledAt: Date | null
+  mfaLastUsedStep: bigint | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -44,16 +70,40 @@ export type UserCountAggregateOutputType = {
   id: number
   username: number
   passwordHash: number
+  mfaEnabled: number
+  mfaSecretCiphertext: number
+  mfaSecretIv: number
+  mfaSecretAuthTag: number
+  mfaSecretKeyVersion: number
+  mfaEnabledAt: number
+  mfaLastUsedStep: number
   createdAt: number
   updatedAt: number
   _all: number
 }
 
 
+export type UserAvgAggregateInputType = {
+  mfaSecretKeyVersion?: true
+  mfaLastUsedStep?: true
+}
+
+export type UserSumAggregateInputType = {
+  mfaSecretKeyVersion?: true
+  mfaLastUsedStep?: true
+}
+
 export type UserMinAggregateInputType = {
   id?: true
   username?: true
   passwordHash?: true
+  mfaEnabled?: true
+  mfaSecretCiphertext?: true
+  mfaSecretIv?: true
+  mfaSecretAuthTag?: true
+  mfaSecretKeyVersion?: true
+  mfaEnabledAt?: true
+  mfaLastUsedStep?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -62,6 +112,13 @@ export type UserMaxAggregateInputType = {
   id?: true
   username?: true
   passwordHash?: true
+  mfaEnabled?: true
+  mfaSecretCiphertext?: true
+  mfaSecretIv?: true
+  mfaSecretAuthTag?: true
+  mfaSecretKeyVersion?: true
+  mfaEnabledAt?: true
+  mfaLastUsedStep?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -70,6 +127,13 @@ export type UserCountAggregateInputType = {
   id?: true
   username?: true
   passwordHash?: true
+  mfaEnabled?: true
+  mfaSecretCiphertext?: true
+  mfaSecretIv?: true
+  mfaSecretAuthTag?: true
+  mfaSecretKeyVersion?: true
+  mfaEnabledAt?: true
+  mfaLastUsedStep?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -113,6 +177,18 @@ export type UserAggregateArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: UserAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: UserSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: UserMinAggregateInputType
@@ -143,6 +219,8 @@ export type UserGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
   take?: number
   skip?: number
   _count?: UserCountAggregateInputType | true
+  _avg?: UserAvgAggregateInputType
+  _sum?: UserSumAggregateInputType
   _min?: UserMinAggregateInputType
   _max?: UserMaxAggregateInputType
 }
@@ -151,9 +229,18 @@ export type UserGroupByOutputType = {
   id: string
   username: string
   passwordHash: string
+  mfaEnabled: boolean
+  mfaSecretCiphertext: runtime.Bytes | null
+  mfaSecretIv: runtime.Bytes | null
+  mfaSecretAuthTag: runtime.Bytes | null
+  mfaSecretKeyVersion: number | null
+  mfaEnabledAt: Date | null
+  mfaLastUsedStep: bigint | null
   createdAt: Date
   updatedAt: Date
   _count: UserCountAggregateOutputType | null
+  _avg: UserAvgAggregateOutputType | null
+  _sum: UserSumAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
   _max: UserMaxAggregateOutputType | null
 }
@@ -180,18 +267,38 @@ export type UserWhereInput = {
   id?: Prisma.StringFilter<"User"> | string
   username?: Prisma.StringFilter<"User"> | string
   passwordHash?: Prisma.StringFilter<"User"> | string
+  mfaEnabled?: Prisma.BoolFilter<"User"> | boolean
+  mfaSecretCiphertext?: Prisma.BytesNullableFilter<"User"> | runtime.Bytes | null
+  mfaSecretIv?: Prisma.BytesNullableFilter<"User"> | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.BytesNullableFilter<"User"> | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.IntNullableFilter<"User"> | number | null
+  mfaEnabledAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  mfaLastUsedStep?: Prisma.BigIntNullableFilter<"User"> | bigint | number | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   sessions?: Prisma.SessionListRelationFilter
+  recoveryCodes?: Prisma.MfaRecoveryCodeListRelationFilter
+  mfaChallenges?: Prisma.MfaChallengeListRelationFilter
+  mfaEnrollment?: Prisma.XOR<Prisma.MfaEnrollmentNullableScalarRelationFilter, Prisma.MfaEnrollmentWhereInput> | null
 }
 
 export type UserOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   username?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  mfaEnabled?: Prisma.SortOrder
+  mfaSecretCiphertext?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaSecretIv?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaSecretAuthTag?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaSecretKeyVersion?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaEnabledAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaLastUsedStep?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   sessions?: Prisma.SessionOrderByRelationAggregateInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeOrderByRelationAggregateInput
+  mfaChallenges?: Prisma.MfaChallengeOrderByRelationAggregateInput
+  mfaEnrollment?: Prisma.MfaEnrollmentOrderByWithRelationInput
   _relevance?: Prisma.UserOrderByRelevanceInput
 }
 
@@ -202,20 +309,39 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.UserWhereInput[]
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   passwordHash?: Prisma.StringFilter<"User"> | string
+  mfaEnabled?: Prisma.BoolFilter<"User"> | boolean
+  mfaSecretCiphertext?: Prisma.BytesNullableFilter<"User"> | runtime.Bytes | null
+  mfaSecretIv?: Prisma.BytesNullableFilter<"User"> | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.BytesNullableFilter<"User"> | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.IntNullableFilter<"User"> | number | null
+  mfaEnabledAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  mfaLastUsedStep?: Prisma.BigIntNullableFilter<"User"> | bigint | number | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   sessions?: Prisma.SessionListRelationFilter
+  recoveryCodes?: Prisma.MfaRecoveryCodeListRelationFilter
+  mfaChallenges?: Prisma.MfaChallengeListRelationFilter
+  mfaEnrollment?: Prisma.XOR<Prisma.MfaEnrollmentNullableScalarRelationFilter, Prisma.MfaEnrollmentWhereInput> | null
 }, "id" | "username">
 
 export type UserOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   username?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  mfaEnabled?: Prisma.SortOrder
+  mfaSecretCiphertext?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaSecretIv?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaSecretAuthTag?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaSecretKeyVersion?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaEnabledAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  mfaLastUsedStep?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
+  _avg?: Prisma.UserAvgOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
   _min?: Prisma.UserMinOrderByAggregateInput
+  _sum?: Prisma.UserSumOrderByAggregateInput
 }
 
 export type UserScalarWhereWithAggregatesInput = {
@@ -225,6 +351,13 @@ export type UserScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"User"> | string
   username?: Prisma.StringWithAggregatesFilter<"User"> | string
   passwordHash?: Prisma.StringWithAggregatesFilter<"User"> | string
+  mfaEnabled?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
+  mfaSecretCiphertext?: Prisma.BytesNullableWithAggregatesFilter<"User"> | runtime.Bytes | null
+  mfaSecretIv?: Prisma.BytesNullableWithAggregatesFilter<"User"> | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.BytesNullableWithAggregatesFilter<"User"> | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.IntNullableWithAggregatesFilter<"User"> | number | null
+  mfaEnabledAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  mfaLastUsedStep?: Prisma.BigIntNullableWithAggregatesFilter<"User"> | bigint | number | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
 }
@@ -233,42 +366,89 @@ export type UserCreateInput = {
   id?: string
   username: string
   passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeCreateNestedManyWithoutUserInput
+  mfaChallenges?: Prisma.MfaChallengeCreateNestedManyWithoutUserInput
+  mfaEnrollment?: Prisma.MfaEnrollmentCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
   id?: string
   username: string
   passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeUncheckedCreateNestedManyWithoutUserInput
+  mfaChallenges?: Prisma.MfaChallengeUncheckedCreateNestedManyWithoutUserInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   username?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeUpdateManyWithoutUserNestedInput
+  mfaChallenges?: Prisma.MfaChallengeUpdateManyWithoutUserNestedInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   username?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeUncheckedUpdateManyWithoutUserNestedInput
+  mfaChallenges?: Prisma.MfaChallengeUncheckedUpdateManyWithoutUserNestedInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
   id?: string
   username: string
   passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -277,6 +457,13 @@ export type UserUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   username?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -285,6 +472,13 @@ export type UserUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   username?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -299,14 +493,33 @@ export type UserCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   username?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  mfaEnabled?: Prisma.SortOrder
+  mfaSecretCiphertext?: Prisma.SortOrder
+  mfaSecretIv?: Prisma.SortOrder
+  mfaSecretAuthTag?: Prisma.SortOrder
+  mfaSecretKeyVersion?: Prisma.SortOrder
+  mfaEnabledAt?: Prisma.SortOrder
+  mfaLastUsedStep?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type UserAvgOrderByAggregateInput = {
+  mfaSecretKeyVersion?: Prisma.SortOrder
+  mfaLastUsedStep?: Prisma.SortOrder
 }
 
 export type UserMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   username?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  mfaEnabled?: Prisma.SortOrder
+  mfaSecretCiphertext?: Prisma.SortOrder
+  mfaSecretIv?: Prisma.SortOrder
+  mfaSecretAuthTag?: Prisma.SortOrder
+  mfaSecretKeyVersion?: Prisma.SortOrder
+  mfaEnabledAt?: Prisma.SortOrder
+  mfaLastUsedStep?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -315,8 +528,20 @@ export type UserMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   username?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  mfaEnabled?: Prisma.SortOrder
+  mfaSecretCiphertext?: Prisma.SortOrder
+  mfaSecretIv?: Prisma.SortOrder
+  mfaSecretAuthTag?: Prisma.SortOrder
+  mfaSecretKeyVersion?: Prisma.SortOrder
+  mfaEnabledAt?: Prisma.SortOrder
+  mfaLastUsedStep?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type UserSumOrderByAggregateInput = {
+  mfaSecretKeyVersion?: Prisma.SortOrder
+  mfaLastUsedStep?: Prisma.SortOrder
 }
 
 export type UserScalarRelationFilter = {
@@ -328,8 +553,78 @@ export type StringFieldUpdateOperationsInput = {
   set?: string
 }
 
+export type BoolFieldUpdateOperationsInput = {
+  set?: boolean
+}
+
+export type NullableBytesFieldUpdateOperationsInput = {
+  set?: runtime.Bytes | null
+}
+
+export type NullableIntFieldUpdateOperationsInput = {
+  set?: number | null
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
+}
+
+export type NullableBigIntFieldUpdateOperationsInput = {
+  set?: bigint | number | null
+  increment?: bigint | number
+  decrement?: bigint | number
+  multiply?: bigint | number
+  divide?: bigint | number
+}
+
 export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
+}
+
+export type UserCreateNestedOneWithoutRecoveryCodesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRecoveryCodesInput, Prisma.UserUncheckedCreateWithoutRecoveryCodesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRecoveryCodesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutRecoveryCodesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutRecoveryCodesInput, Prisma.UserUncheckedCreateWithoutRecoveryCodesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutRecoveryCodesInput
+  upsert?: Prisma.UserUpsertWithoutRecoveryCodesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRecoveryCodesInput, Prisma.UserUpdateWithoutRecoveryCodesInput>, Prisma.UserUncheckedUpdateWithoutRecoveryCodesInput>
+}
+
+export type UserCreateNestedOneWithoutMfaChallengesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutMfaChallengesInput, Prisma.UserUncheckedCreateWithoutMfaChallengesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMfaChallengesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutMfaChallengesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutMfaChallengesInput, Prisma.UserUncheckedCreateWithoutMfaChallengesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMfaChallengesInput
+  upsert?: Prisma.UserUpsertWithoutMfaChallengesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutMfaChallengesInput, Prisma.UserUpdateWithoutMfaChallengesInput>, Prisma.UserUncheckedUpdateWithoutMfaChallengesInput>
+}
+
+export type UserCreateNestedOneWithoutMfaEnrollmentInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutMfaEnrollmentInput, Prisma.UserUncheckedCreateWithoutMfaEnrollmentInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMfaEnrollmentInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutMfaEnrollmentNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutMfaEnrollmentInput, Prisma.UserUncheckedCreateWithoutMfaEnrollmentInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMfaEnrollmentInput
+  upsert?: Prisma.UserUpsertWithoutMfaEnrollmentInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutMfaEnrollmentInput, Prisma.UserUpdateWithoutMfaEnrollmentInput>, Prisma.UserUncheckedUpdateWithoutMfaEnrollmentInput>
 }
 
 export type UserCreateNestedOneWithoutSessionsInput = {
@@ -346,20 +641,304 @@ export type UserUpdateOneRequiredWithoutSessionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutSessionsInput, Prisma.UserUpdateWithoutSessionsInput>, Prisma.UserUncheckedUpdateWithoutSessionsInput>
 }
 
+export type UserCreateWithoutRecoveryCodesInput = {
+  id?: string
+  username: string
+  passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  mfaChallenges?: Prisma.MfaChallengeCreateNestedManyWithoutUserInput
+  mfaEnrollment?: Prisma.MfaEnrollmentCreateNestedOneWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutRecoveryCodesInput = {
+  id?: string
+  username: string
+  passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  mfaChallenges?: Prisma.MfaChallengeUncheckedCreateNestedManyWithoutUserInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUncheckedCreateNestedOneWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutRecoveryCodesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutRecoveryCodesInput, Prisma.UserUncheckedCreateWithoutRecoveryCodesInput>
+}
+
+export type UserUpsertWithoutRecoveryCodesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutRecoveryCodesInput, Prisma.UserUncheckedUpdateWithoutRecoveryCodesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutRecoveryCodesInput, Prisma.UserUncheckedCreateWithoutRecoveryCodesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutRecoveryCodesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutRecoveryCodesInput, Prisma.UserUncheckedUpdateWithoutRecoveryCodesInput>
+}
+
+export type UserUpdateWithoutRecoveryCodesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  mfaChallenges?: Prisma.MfaChallengeUpdateManyWithoutUserNestedInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUpdateOneWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutRecoveryCodesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  mfaChallenges?: Prisma.MfaChallengeUncheckedUpdateManyWithoutUserNestedInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUncheckedUpdateOneWithoutUserNestedInput
+}
+
+export type UserCreateWithoutMfaChallengesInput = {
+  id?: string
+  username: string
+  passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeCreateNestedManyWithoutUserInput
+  mfaEnrollment?: Prisma.MfaEnrollmentCreateNestedOneWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutMfaChallengesInput = {
+  id?: string
+  username: string
+  passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeUncheckedCreateNestedManyWithoutUserInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUncheckedCreateNestedOneWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutMfaChallengesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutMfaChallengesInput, Prisma.UserUncheckedCreateWithoutMfaChallengesInput>
+}
+
+export type UserUpsertWithoutMfaChallengesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutMfaChallengesInput, Prisma.UserUncheckedUpdateWithoutMfaChallengesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutMfaChallengesInput, Prisma.UserUncheckedCreateWithoutMfaChallengesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutMfaChallengesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutMfaChallengesInput, Prisma.UserUncheckedUpdateWithoutMfaChallengesInput>
+}
+
+export type UserUpdateWithoutMfaChallengesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeUpdateManyWithoutUserNestedInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUpdateOneWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutMfaChallengesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeUncheckedUpdateManyWithoutUserNestedInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUncheckedUpdateOneWithoutUserNestedInput
+}
+
+export type UserCreateWithoutMfaEnrollmentInput = {
+  id?: string
+  username: string
+  passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeCreateNestedManyWithoutUserInput
+  mfaChallenges?: Prisma.MfaChallengeCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutMfaEnrollmentInput = {
+  id?: string
+  username: string
+  passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeUncheckedCreateNestedManyWithoutUserInput
+  mfaChallenges?: Prisma.MfaChallengeUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutMfaEnrollmentInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutMfaEnrollmentInput, Prisma.UserUncheckedCreateWithoutMfaEnrollmentInput>
+}
+
+export type UserUpsertWithoutMfaEnrollmentInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutMfaEnrollmentInput, Prisma.UserUncheckedUpdateWithoutMfaEnrollmentInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutMfaEnrollmentInput, Prisma.UserUncheckedCreateWithoutMfaEnrollmentInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutMfaEnrollmentInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutMfaEnrollmentInput, Prisma.UserUncheckedUpdateWithoutMfaEnrollmentInput>
+}
+
+export type UserUpdateWithoutMfaEnrollmentInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeUpdateManyWithoutUserNestedInput
+  mfaChallenges?: Prisma.MfaChallengeUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutMfaEnrollmentInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  username?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  recoveryCodes?: Prisma.MfaRecoveryCodeUncheckedUpdateManyWithoutUserNestedInput
+  mfaChallenges?: Prisma.MfaChallengeUncheckedUpdateManyWithoutUserNestedInput
+}
+
 export type UserCreateWithoutSessionsInput = {
   id?: string
   username: string
   passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  recoveryCodes?: Prisma.MfaRecoveryCodeCreateNestedManyWithoutUserInput
+  mfaChallenges?: Prisma.MfaChallengeCreateNestedManyWithoutUserInput
+  mfaEnrollment?: Prisma.MfaEnrollmentCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSessionsInput = {
   id?: string
   username: string
   passwordHash: string
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: runtime.Bytes | null
+  mfaSecretIv?: runtime.Bytes | null
+  mfaSecretAuthTag?: runtime.Bytes | null
+  mfaSecretKeyVersion?: number | null
+  mfaEnabledAt?: Date | string | null
+  mfaLastUsedStep?: bigint | number | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  recoveryCodes?: Prisma.MfaRecoveryCodeUncheckedCreateNestedManyWithoutUserInput
+  mfaChallenges?: Prisma.MfaChallengeUncheckedCreateNestedManyWithoutUserInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSessionsInput = {
@@ -382,16 +961,36 @@ export type UserUpdateWithoutSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   username?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  recoveryCodes?: Prisma.MfaRecoveryCodeUpdateManyWithoutUserNestedInput
+  mfaChallenges?: Prisma.MfaChallengeUpdateManyWithoutUserNestedInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   username?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  mfaEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mfaSecretCiphertext?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretIv?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretAuthTag?: Prisma.NullableBytesFieldUpdateOperationsInput | runtime.Bytes | null
+  mfaSecretKeyVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  mfaEnabledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mfaLastUsedStep?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  recoveryCodes?: Prisma.MfaRecoveryCodeUncheckedUpdateManyWithoutUserNestedInput
+  mfaChallenges?: Prisma.MfaChallengeUncheckedUpdateManyWithoutUserNestedInput
+  mfaEnrollment?: Prisma.MfaEnrollmentUncheckedUpdateOneWithoutUserNestedInput
 }
 
 
@@ -401,10 +1000,14 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
 
 export type UserCountOutputType = {
   sessions: number
+  recoveryCodes: number
+  mfaChallenges: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   sessions?: boolean | UserCountOutputTypeCountSessionsArgs
+  recoveryCodes?: boolean | UserCountOutputTypeCountRecoveryCodesArgs
+  mfaChallenges?: boolean | UserCountOutputTypeCountMfaChallengesArgs
 }
 
 /**
@@ -424,14 +1027,38 @@ export type UserCountOutputTypeCountSessionsArgs<ExtArgs extends runtime.Types.E
   where?: Prisma.SessionWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountRecoveryCodesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.MfaRecoveryCodeWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountMfaChallengesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.MfaChallengeWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
   username?: boolean
   passwordHash?: boolean
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: boolean
+  mfaSecretIv?: boolean
+  mfaSecretAuthTag?: boolean
+  mfaSecretKeyVersion?: boolean
+  mfaEnabledAt?: boolean
+  mfaLastUsedStep?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   sessions?: boolean | Prisma.User$sessionsArgs<ExtArgs>
+  recoveryCodes?: boolean | Prisma.User$recoveryCodesArgs<ExtArgs>
+  mfaChallenges?: boolean | Prisma.User$mfaChallengesArgs<ExtArgs>
+  mfaEnrollment?: boolean | Prisma.User$mfaEnrollmentArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -441,13 +1068,23 @@ export type UserSelectScalar = {
   id?: boolean
   username?: boolean
   passwordHash?: boolean
+  mfaEnabled?: boolean
+  mfaSecretCiphertext?: boolean
+  mfaSecretIv?: boolean
+  mfaSecretAuthTag?: boolean
+  mfaSecretKeyVersion?: boolean
+  mfaEnabledAt?: boolean
+  mfaLastUsedStep?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "username" | "passwordHash" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "username" | "passwordHash" | "mfaEnabled" | "mfaSecretCiphertext" | "mfaSecretIv" | "mfaSecretAuthTag" | "mfaSecretKeyVersion" | "mfaEnabledAt" | "mfaLastUsedStep" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   sessions?: boolean | Prisma.User$sessionsArgs<ExtArgs>
+  recoveryCodes?: boolean | Prisma.User$recoveryCodesArgs<ExtArgs>
+  mfaChallenges?: boolean | Prisma.User$mfaChallengesArgs<ExtArgs>
+  mfaEnrollment?: boolean | Prisma.User$mfaEnrollmentArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 
@@ -455,11 +1092,21 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   name: "User"
   objects: {
     sessions: Prisma.$SessionPayload<ExtArgs>[]
+    recoveryCodes: Prisma.$MfaRecoveryCodePayload<ExtArgs>[]
+    mfaChallenges: Prisma.$MfaChallengePayload<ExtArgs>[]
+    mfaEnrollment: Prisma.$MfaEnrollmentPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     username: string
     passwordHash: string
+    mfaEnabled: boolean
+    mfaSecretCiphertext: runtime.Bytes | null
+    mfaSecretIv: runtime.Bytes | null
+    mfaSecretAuthTag: runtime.Bytes | null
+    mfaSecretKeyVersion: number | null
+    mfaEnabledAt: Date | null
+    mfaLastUsedStep: bigint | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["user"]>
@@ -803,6 +1450,9 @@ readonly fields: UserFieldRefs;
 export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   sessions<T extends Prisma.User$sessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  recoveryCodes<T extends Prisma.User$recoveryCodesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$recoveryCodesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MfaRecoveryCodePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  mfaChallenges<T extends Prisma.User$mfaChallengesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$mfaChallengesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MfaChallengePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  mfaEnrollment<T extends Prisma.User$mfaEnrollmentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$mfaEnrollmentArgs<ExtArgs>>): Prisma.Prisma__MfaEnrollmentClient<runtime.Types.Result.GetResult<Prisma.$MfaEnrollmentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -835,6 +1485,13 @@ export interface UserFieldRefs {
   readonly id: Prisma.FieldRef<"User", 'String'>
   readonly username: Prisma.FieldRef<"User", 'String'>
   readonly passwordHash: Prisma.FieldRef<"User", 'String'>
+  readonly mfaEnabled: Prisma.FieldRef<"User", 'Boolean'>
+  readonly mfaSecretCiphertext: Prisma.FieldRef<"User", 'Bytes'>
+  readonly mfaSecretIv: Prisma.FieldRef<"User", 'Bytes'>
+  readonly mfaSecretAuthTag: Prisma.FieldRef<"User", 'Bytes'>
+  readonly mfaSecretKeyVersion: Prisma.FieldRef<"User", 'Int'>
+  readonly mfaEnabledAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly mfaLastUsedStep: Prisma.FieldRef<"User", 'BigInt'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"User", 'DateTime'>
 }
@@ -1206,6 +1863,73 @@ export type User$sessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   take?: number
   skip?: number
   distinct?: Prisma.SessionScalarFieldEnum | Prisma.SessionScalarFieldEnum[]
+}
+
+/**
+ * User.recoveryCodes
+ */
+export type User$recoveryCodesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the MfaRecoveryCode
+   */
+  select?: Prisma.MfaRecoveryCodeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the MfaRecoveryCode
+   */
+  omit?: Prisma.MfaRecoveryCodeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MfaRecoveryCodeInclude<ExtArgs> | null
+  where?: Prisma.MfaRecoveryCodeWhereInput
+  orderBy?: Prisma.MfaRecoveryCodeOrderByWithRelationInput | Prisma.MfaRecoveryCodeOrderByWithRelationInput[]
+  cursor?: Prisma.MfaRecoveryCodeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.MfaRecoveryCodeScalarFieldEnum | Prisma.MfaRecoveryCodeScalarFieldEnum[]
+}
+
+/**
+ * User.mfaChallenges
+ */
+export type User$mfaChallengesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the MfaChallenge
+   */
+  select?: Prisma.MfaChallengeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the MfaChallenge
+   */
+  omit?: Prisma.MfaChallengeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MfaChallengeInclude<ExtArgs> | null
+  where?: Prisma.MfaChallengeWhereInput
+  orderBy?: Prisma.MfaChallengeOrderByWithRelationInput | Prisma.MfaChallengeOrderByWithRelationInput[]
+  cursor?: Prisma.MfaChallengeWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.MfaChallengeScalarFieldEnum | Prisma.MfaChallengeScalarFieldEnum[]
+}
+
+/**
+ * User.mfaEnrollment
+ */
+export type User$mfaEnrollmentArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the MfaEnrollment
+   */
+  select?: Prisma.MfaEnrollmentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the MfaEnrollment
+   */
+  omit?: Prisma.MfaEnrollmentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MfaEnrollmentInclude<ExtArgs> | null
+  where?: Prisma.MfaEnrollmentWhereInput
 }
 
 /**

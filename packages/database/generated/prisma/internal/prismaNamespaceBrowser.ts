@@ -52,6 +52,9 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   User: 'User',
+  MfaRecoveryCode: 'MfaRecoveryCode',
+  MfaChallenge: 'MfaChallenge',
+  MfaEnrollment: 'MfaEnrollment',
   AuthAuditEvent: 'AuthAuditEvent',
   Session: 'Session',
   SetupState: 'SetupState',
@@ -87,11 +90,56 @@ export const UserScalarFieldEnum = {
   id: 'id',
   username: 'username',
   passwordHash: 'passwordHash',
+  mfaEnabled: 'mfaEnabled',
+  mfaSecretCiphertext: 'mfaSecretCiphertext',
+  mfaSecretIv: 'mfaSecretIv',
+  mfaSecretAuthTag: 'mfaSecretAuthTag',
+  mfaSecretKeyVersion: 'mfaSecretKeyVersion',
+  mfaEnabledAt: 'mfaEnabledAt',
+  mfaLastUsedStep: 'mfaLastUsedStep',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const MfaRecoveryCodeScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  codeHash: 'codeHash',
+  usedAt: 'usedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type MfaRecoveryCodeScalarFieldEnum = (typeof MfaRecoveryCodeScalarFieldEnum)[keyof typeof MfaRecoveryCodeScalarFieldEnum]
+
+
+export const MfaChallengeScalarFieldEnum = {
+  id: 'id',
+  tokenHash: 'tokenHash',
+  userId: 'userId',
+  expiresAt: 'expiresAt',
+  failedAttempts: 'failedAttempts',
+  consumedAt: 'consumedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type MfaChallengeScalarFieldEnum = (typeof MfaChallengeScalarFieldEnum)[keyof typeof MfaChallengeScalarFieldEnum]
+
+
+export const MfaEnrollmentScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  secretCiphertext: 'secretCiphertext',
+  secretIv: 'secretIv',
+  secretAuthTag: 'secretAuthTag',
+  secretKeyVersion: 'secretKeyVersion',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+} as const
+
+export type MfaEnrollmentScalarFieldEnum = (typeof MfaEnrollmentScalarFieldEnum)[keyof typeof MfaEnrollmentScalarFieldEnum]
 
 
 export const AuthAuditEventScalarFieldEnum = {
@@ -113,6 +161,7 @@ export const SessionScalarFieldEnum = {
   userId: 'userId',
   expiresAt: 'expiresAt',
   lastSeenAt: 'lastSeenAt',
+  stronglyAuthenticatedUntil: 'stronglyAuthenticatedUntil',
   createdAt: 'createdAt'
 } as const
 
@@ -312,6 +361,14 @@ export const NullableJsonNullValueInput = {
 export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
 
 
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
 export const UserOrderByRelevanceFieldEnum = {
   id: 'id',
   username: 'username',
@@ -321,12 +378,30 @@ export const UserOrderByRelevanceFieldEnum = {
 export type UserOrderByRelevanceFieldEnum = (typeof UserOrderByRelevanceFieldEnum)[keyof typeof UserOrderByRelevanceFieldEnum]
 
 
-export const NullsOrder = {
-  first: 'first',
-  last: 'last'
+export const MfaRecoveryCodeOrderByRelevanceFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  codeHash: 'codeHash'
 } as const
 
-export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+export type MfaRecoveryCodeOrderByRelevanceFieldEnum = (typeof MfaRecoveryCodeOrderByRelevanceFieldEnum)[keyof typeof MfaRecoveryCodeOrderByRelevanceFieldEnum]
+
+
+export const MfaChallengeOrderByRelevanceFieldEnum = {
+  id: 'id',
+  tokenHash: 'tokenHash',
+  userId: 'userId'
+} as const
+
+export type MfaChallengeOrderByRelevanceFieldEnum = (typeof MfaChallengeOrderByRelevanceFieldEnum)[keyof typeof MfaChallengeOrderByRelevanceFieldEnum]
+
+
+export const MfaEnrollmentOrderByRelevanceFieldEnum = {
+  id: 'id',
+  userId: 'userId'
+} as const
+
+export type MfaEnrollmentOrderByRelevanceFieldEnum = (typeof MfaEnrollmentOrderByRelevanceFieldEnum)[keyof typeof MfaEnrollmentOrderByRelevanceFieldEnum]
 
 
 export const AuthAuditEventOrderByRelevanceFieldEnum = {

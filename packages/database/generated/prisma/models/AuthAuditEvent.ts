@@ -360,10 +360,6 @@ export type EnumAuthAuditEventTypeFieldUpdateOperationsInput = {
   set?: $Enums.AuthAuditEventType
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
-}
-
 export type NullableStringFieldUpdateOperationsInput = {
   set?: string | null
 }

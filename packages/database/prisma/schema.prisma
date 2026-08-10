@@ -59,15 +59,68 @@ enum AuthAuditEventType {
   TURNSTILE_FAILED
   LOGOUT
   SESSION_EXPIRED
+  MFA_ENROLLMENT_STARTED
+  MFA_ENABLED
+  MFA_CHALLENGE_FAILED
+  MFA_LOGIN_SUCCESS
+  MFA_RECOVERY_CODE_USED
+  MFA_RECOVERY_CODES_REGENERATED
+  MFA_DISABLED
 }
 
 model User {
-  id           String    @id @default(cuid())
-  username     String    @unique @db.VarChar(191)
-  passwordHash String    @db.VarChar(255)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  sessions     Session[]
+  id                  String            @id @default(cuid())
+  username            String            @unique @db.VarChar(191)
+  passwordHash        String            @db.VarChar(255)
+  mfaEnabled          Boolean           @default(false)
+  mfaSecretCiphertext Bytes?
+  mfaSecretIv         Bytes?
+  mfaSecretAuthTag    Bytes?
+  mfaSecretKeyVersion Int?
+  mfaEnabledAt        DateTime?
+  mfaLastUsedStep     BigInt?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  sessions            Session[]
+  recoveryCodes       MfaRecoveryCode[]
+  mfaChallenges       MfaChallenge[]
+  mfaEnrollment       MfaEnrollment?
+}
+
+model MfaRecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String    @db.Char(64)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([userId, usedAt])
+}
+
+model MfaChallenge {
+  id             String    @id @default(cuid())
+  tokenHash      String    @unique @db.Char(64)
+  userId         String
+  expiresAt      DateTime
+  failedAttempts Int       @default(0)
+  consumedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model MfaEnrollment {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  secretCiphertext Bytes
+  secretIv         Bytes
+  secretAuthTag    Bytes
+  secretKeyVersion Int      @default(1)
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model AuthAuditEvent {
@@ -83,13 +136,14 @@ model AuthAuditEvent {
 }
 
 model Session {
-  id        String   @id @default(cuid())
-  tokenHash String   @unique @db.Char(64)
-  userId    String
-  expiresAt DateTime
-  lastSeenAt DateTime @default(now())
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                          String    @id @default(cuid())
+  tokenHash                   String    @unique @db.Char(64)
+  userId                      String
+  expiresAt                   DateTime
+  lastSeenAt                  DateTime  @default(now())
+  stronglyAuthenticatedUntil  DateTime?
+  createdAt                   DateTime  @default(now())
+  user                        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@index([userId])
   @@index([expiresAt])
 }

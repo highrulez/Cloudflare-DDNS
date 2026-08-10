@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNo
 import { Navigate } from 'react-router-dom';
 import { api, type HistoryItem, type Settings } from '../api';
 import { useAuth } from '../auth';
+import { MfaSettingsCard } from '../components/mfa-settings';
 import {
   Badge,
   Button,
@@ -289,6 +290,7 @@ export function SettingsPage() {
               <Button busy={busy === 'password'}>Change password</Button>
             </form>
           </Card>
+          <MfaSettingsCard />
         </div>
       </div>
     </div>
