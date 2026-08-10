@@ -350,6 +350,7 @@ export function MaskedValue({
   initiallyVisible?: boolean;
 }) {
   const [visible, setVisible] = useState(initiallyVisible);
+  const [copied, setCopied] = useState(false);
   if (!value) {
     return <span className="ops-mono text-slate-400">{empty}</span>;
   }
@@ -372,10 +373,18 @@ export function MaskedValue({
         type="button"
         className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/5 dark:hover:text-slate-200"
         aria-label={`Copy ${label}`}
-        onClick={() => void navigator.clipboard.writeText(value)}
+        onClick={() => {
+          void navigator.clipboard.writeText(value).then(() => {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1500);
+          });
+        }}
       >
         <Copy className="h-3.5 w-3.5" />
       </button>
+      {copied && (
+        <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-300">Copied</span>
+      )}
     </span>
   );
 }

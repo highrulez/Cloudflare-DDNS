@@ -289,6 +289,7 @@ export function registerSystemRoutes(
       lease,
       lastRun,
       lastUpdate,
+      managedRecords,
       osName,
       id
     ] = await Promise.all([
@@ -308,11 +309,13 @@ export function registerSystemRoutes(
         where: { action: 'UPDATED', result: 'SUCCESS' },
         orderBy: { createdAt: 'desc' }
       }),
+      db.managedDnsRecord.count(),
       readSynologyVersion(),
       containerId()
     ]);
     const resultFor = (family: 'IPV4' | 'IPV6') =>
       detectionResults.find((result) => result.family === family);
+    const proxy = requestProxyInfo(request, config);
     return {
       generatedAt: new Date().toISOString(),
       network: {
@@ -353,10 +356,21 @@ export function registerSystemRoutes(
         lastRunAt: normalizeSystemTimestamp(lastRun?.finishedAt ?? lastRun?.startedAt),
         nextRunAt: normalizeSystemTimestamp(schedulerState?.nextCheckAt),
         lastSuccessfulUpdate: normalizeSystemTimestamp(lastUpdate?.createdAt),
+        lastError: schedulerState?.lastError
+          ? sanitizeDiagnosticText(schedulerState.lastError)
+          : null,
+        managedRecords,
         leaseOwner: lease?.ownerId ?? schedulerState?.ownerId ?? scheduler.ownerId,
         schedulerVersion: process.env.CONFIG_VERSION ?? '1'
       },
-      reverseProxy: requestProxyInfo(request, config),
+      reverseProxy: proxy,
+      security: {
+        https: proxy.https,
+        reverseProxyDetected: proxy.reverseProxyDetected,
+        cookieSecure: config.COOKIE_SECURE,
+        turnstileConfigured: Boolean(config.TURNSTILE_SITE_KEY && config.TURNSTILE_SECRET_KEY),
+        strongAuthAvailable: true
+      },
       application: {
         version: process.env.APP_VERSION ?? '1.0.0',
         commit: process.env.GIT_COMMIT ?? 'unknown',

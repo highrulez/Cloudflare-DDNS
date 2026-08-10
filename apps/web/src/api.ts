@@ -176,6 +176,8 @@ export type SystemOverview = {
     lastRunAt: string | null;
     nextRunAt: string | null;
     lastSuccessfulUpdate: string | null;
+    lastError: string | null;
+    managedRecords: number;
     leaseOwner: string;
     schedulerVersion: string;
   };
@@ -193,6 +195,13 @@ export type SystemOverview = {
     cookieSecure: boolean;
     trustProxy: boolean;
     warnings: string[];
+  };
+  security: {
+    https: boolean;
+    reverseProxyDetected: boolean;
+    cookieSecure: boolean;
+    turnstileConfigured: boolean;
+    strongAuthAvailable: boolean;
   };
   application: {
     version: string;
