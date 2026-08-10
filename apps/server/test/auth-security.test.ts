@@ -132,7 +132,7 @@ describe('Turnstile siteverify', () => {
         '203.0.113.10',
         mockSiteverify({
           success: true,
-          hostname: 'dns.highrulez.com',
+          hostname: 'ddns.example.com',
           action: 'login'
         })
       )
@@ -167,7 +167,7 @@ describe('Turnstile siteverify', () => {
         config,
         'token',
         '1.1.1.1',
-        mockSiteverify({ success: true, hostname: 'dns.highrulez.com', action: 'signup' })
+        mockSiteverify({ success: true, hostname: 'ddns.example.com', action: 'signup' })
       )
     ).rejects.toBeInstanceOf(TurnstileError);
     await expect(
@@ -209,7 +209,7 @@ describe('authentication security sprint', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       mockSiteverify({
         success: true,
-        hostname: 'dns.highrulez.com',
+        hostname: 'ddns.example.com',
         action: 'login'
       })
     );
@@ -233,10 +233,10 @@ describe('authentication security sprint', () => {
       url: '/api/auth/login',
       remoteAddress: '203.0.113.10',
       headers: {
-        origin: 'https://dns.highrulez.com',
+        origin: 'https://ddns.example.com',
         'user-agent': 'security-test',
         'x-forwarded-proto': 'https',
-        'x-forwarded-host': 'dns.highrulez.com'
+        'x-forwarded-host': 'ddns.example.com'
       },
       payload: {
         username: user.username,
@@ -257,7 +257,7 @@ describe('authentication security sprint', () => {
       url: '/api/auth/login',
       remoteAddress: '203.0.113.10',
       headers: {
-        origin: 'https://dns.highrulez.com',
+        origin: 'https://ddns.example.com',
         cookie: firstCookie.split(';')[0]!,
         'x-forwarded-proto': 'https'
       },
@@ -287,7 +287,7 @@ describe('authentication security sprint', () => {
       method: 'POST',
       url: '/api/auth/logout',
       headers: {
-        origin: 'https://dns.highrulez.com',
+        origin: 'https://ddns.example.com',
         cookie: secondCookie.split(';')[0]!
       }
     });
@@ -325,7 +325,7 @@ describe('authentication security sprint', () => {
     const missing = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      headers: { origin: 'https://dns.highrulez.com' },
+      headers: { origin: 'https://ddns.example.com' },
       payload: { username: user.username, password }
     });
     expect(missing.statusCode).toBe(400);
@@ -336,7 +336,7 @@ describe('authentication security sprint', () => {
     const invalid = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      headers: { origin: 'https://dns.highrulez.com' },
+      headers: { origin: 'https://ddns.example.com' },
       payload: {
         username: user.username,
         password,
@@ -363,7 +363,7 @@ describe('authentication security sprint', () => {
     const unknown = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      headers: { origin: 'https://dns.highrulez.com' },
+      headers: { origin: 'https://ddns.example.com' },
       payload: {
         username: 'nobody',
         password,
@@ -373,7 +373,7 @@ describe('authentication security sprint', () => {
     const wrong = await app.inject({
       method: 'POST',
       url: '/api/auth/login',
-      headers: { origin: 'https://dns.highrulez.com' },
+      headers: { origin: 'https://ddns.example.com' },
       payload: {
         username: user.username,
         password: 'wrong password here!!',
@@ -406,7 +406,7 @@ describe('authentication security sprint', () => {
         method: 'POST',
         url: '/api/auth/login',
         remoteAddress: '198.51.100.20',
-        headers: { origin: 'https://dns.highrulez.com' },
+        headers: { origin: 'https://ddns.example.com' },
         payload: {
           username: user.username,
           password: 'wrong password here!!',
@@ -420,7 +420,7 @@ describe('authentication security sprint', () => {
       method: 'POST',
       url: '/api/auth/login',
       remoteAddress: '198.51.100.20',
-      headers: { origin: 'https://dns.highrulez.com' },
+      headers: { origin: 'https://ddns.example.com' },
       payload: {
         username: user.username,
         password: 'wrong password here!!',
@@ -442,7 +442,7 @@ describe('authentication security sprint', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       siteKey: TURNSTILE_TEST_SITE_KEY,
-      expectedHostname: 'dns.highrulez.com',
+      expectedHostname: 'ddns.example.com',
       expectedAction: 'login'
     });
     expect(JSON.stringify(response.json())).not.toContain(TURNSTILE_TEST_SECRET_KEY);
@@ -462,7 +462,7 @@ describe('authentication security sprint', () => {
       method: 'POST',
       url: '/api/auth/login',
       headers: {
-        origin: 'https://dns.highrulez.com',
+        origin: 'https://ddns.example.com',
         'x-forwarded-proto': 'https'
       },
       payload: {
@@ -498,7 +498,7 @@ describe('authentication security sprint', () => {
         DATABASE_URL: 'mysql://user:password@127.0.0.1:3307/ddns',
         SESSION_SECRET: 'a-session-secret-that-is-longer-than-32-characters',
         ENCRYPTION_KEY: Buffer.alloc(32).toString('base64'),
-        APP_ORIGIN: 'https://dns.highrulez.com',
+        APP_ORIGIN: 'https://ddns.example.com',
         COOKIE_SECURE: 'true'
       })
     ).toThrow(/TURNSTILE/);

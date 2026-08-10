@@ -27,7 +27,7 @@ describe('setup body handling', () => {
       IPV4_PROVIDERS: ['https://api.ipify.org'],
       IPV6_PROVIDERS: ['https://api6.ipify.org'],
       HTTP_TIMEOUT_MS: 5000,
-      TURNSTILE_EXPECTED_HOSTNAME: 'dns.highrulez.com',
+      TURNSTILE_EXPECTED_HOSTNAME: 'ddns.example.com',
       TURNSTILE_EXPECTED_ACTION: 'login',
       TURNSTILE_VERIFY_TIMEOUT_MS: 5000
     };

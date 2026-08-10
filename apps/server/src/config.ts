@@ -88,7 +88,7 @@ const schema = z
     HTTP_TIMEOUT_MS: z.coerce.number().int().min(500).max(60_000).default(10_000),
     TURNSTILE_SITE_KEY: z.string().min(1).optional(),
     TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
-    TURNSTILE_EXPECTED_HOSTNAME: z.string().min(1).default('dns.highrulez.com'),
+    TURNSTILE_EXPECTED_HOSTNAME: z.string().min(1).default('ddns.example.com'),
     TURNSTILE_EXPECTED_ACTION: z
       .string()
       .regex(/^[A-Za-z0-9_-]{1,32}$/)

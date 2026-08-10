@@ -9,7 +9,7 @@ describe('authentication smoke flow', () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       mockSiteverify({
         success: true,
-        hostname: 'dns.highrulez.com',
+        hostname: 'ddns.example.com',
         action: 'login'
       })
     );
@@ -73,9 +73,9 @@ describe('authentication smoke flow', () => {
       url: '/api/auth/login',
       remoteAddress: '127.0.0.1',
       headers: {
-        origin: 'https://dns.highrulez.com',
+        origin: 'https://ddns.example.com',
         'x-forwarded-proto': 'https',
-        'x-forwarded-host': 'dns.highrulez.com'
+        'x-forwarded-host': 'ddns.example.com'
       },
       payload: {
         username: user.username,

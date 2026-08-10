@@ -1,5 +1,14 @@
 # Synology DSM deployment
 
+This guide uses documentation-safe example values. Replace every placeholder with your own hostname,
+LAN address, database credentials, and Cloudflare/Turnstile secrets before deploying.
+
+| Placeholder | Example | Replace with |
+| --- | --- | --- |
+| Public HTTPS URL | `https://ddns.example.com` | Your reverse-proxied application hostname |
+| LAN diagnostics URL | `http://192.0.2.10:8090` | Your NAS LAN IP and app port |
+| Database | `infrahub` / `ddns_app` | Your MariaDB database and non-root user |
+
 ## Container Manager project
 
 1. Place the repository in a shared folder, for example
@@ -10,7 +19,8 @@
    MariaDB user grant applies. Verify before changing it.
 4. In Container Manager, create a Project from the repository directory and select `compose.yaml`.
 5. Build and start the project.
-6. Configure the reverse proxy, then open `https://dns.highrulez.com`.
+6. Configure the reverse proxy, then open your public HTTPS URL (example:
+   `https://ddns.example.com`).
 
 The project creates exactly one container:
 
@@ -39,13 +49,13 @@ Before starting the application:
 For example:
 
 ```dotenv
-DATABASE_URL=mysql://cloudflare_ddns:encoded-password@192.168.1.10:3307/cloudflare_ddns
+DATABASE_URL=mysql://ddns_app:CHANGE_ME@127.0.0.1:3306/infrahub
 ```
 
 With host networking, `127.0.0.1` and `localhost` refer to the Synology host. However, keep the
-existing LAN-address URL until all of the following are verified:
+existing working URL until all of the following are verified:
 
-- MariaDB accepts TCP connections on loopback.
+- MariaDB accepts TCP connections on loopback (or the address you configured).
 - The application user has an applicable MariaDB host grant.
 - The existing URL works from the host-networked application image.
 
@@ -70,52 +80,60 @@ The startup process does not create the MariaDB server, database, or user.
 Create a Synology DSM reverse-proxy rule:
 
 - Source protocol: `HTTPS`
-- Source hostname: `dns.highrulez.com`
+- Source hostname: `ddns.example.com` (your hostname)
 - Source port: `443`
 - Destination protocol: `HTTP`
 - Destination hostname: `127.0.0.1`
 - Destination port: `8090`
 
-Set `APP_ORIGIN=https://dns.highrulez.com` and
-`APP_ALLOWED_ORIGINS=https://dns.highrulez.com,http://192.168.68.100:8090`. Keep
-`COOKIE_SECURE=true`. Ensure Synology forwards:
+Set matching application origins, for example:
+
+```env
+APP_ORIGIN=https://ddns.example.com
+APP_ALLOWED_ORIGINS=https://ddns.example.com,http://192.0.2.10:8090
+COOKIE_SECURE=true
+```
+
+Ensure Synology forwards:
 
 - `X-Forwarded-Proto: https`
-- `X-Forwarded-Host: dns.highrulez.com`
+- `X-Forwarded-Host: ddns.example.com` (your hostname)
 - `X-Forwarded-Port: 443`
 - `X-Forwarded-For: $remote_addr`
 
 Fastify trusts forwarded headers only from loopback (`127.0.0.1` or `::1`), matching the destination
 above. Direct LAN clients cannot spoof `request.protocol`, `request.hostname`, or `request.ip`.
 Mutating browser requests must present an Origin that exactly matches an entry in
-`APP_ALLOWED_ORIGINS` (and/or `APP_ORIGIN`). Do not expose port `8090` publicly. After signing in, open
-**System → Overview** and confirm HTTPS, original host, client IP, secure cookies, and trusted-proxy
-handling are healthy.
+`APP_ALLOWED_ORIGINS` (and/or `APP_ORIGIN`). Do not expose port `8090` publicly. After signing in,
+open **System → Overview** and confirm HTTPS, original host, client IP, secure cookies, and
+trusted-proxy handling are healthy.
 
-Direct LAN access at `http://192.168.68.100:8090` remains available for diagnostics and health
-checks. Authenticated production administration should use `https://dns.highrulez.com`.
+Direct LAN access at `http://192.0.2.10:8090` (your NAS IP) remains useful for diagnostics and
+health checks. Authenticated production administration should use the public HTTPS hostname.
 
-Turnstile Siteverify expects hostname `dns.highrulez.com` and action `login`. Do not disable
-Turnstile, skip Siteverify, or set `COOKIE_SECURE=false` globally to make raw-IP HTTP login work.
-LAN HTTP sessions may receive a non-Secure cookie for that HTTP origin only when a session is
-issued; production HTTPS sessions continue to use Secure cookies. Production Turnstile widgets
-bound to `dns.highrulez.com` will not validate against the raw LAN hostname.
+Turnstile Siteverify expects your configured `TURNSTILE_EXPECTED_HOSTNAME` (example:
+`ddns.example.com`) and action `login`. Do not disable Turnstile, skip Siteverify, or set
+`COOKIE_SECURE=false` globally to make raw-IP HTTP login work. LAN HTTP sessions may receive a
+non-Secure cookie for that HTTP origin only when a session is issued; production HTTPS sessions
+continue to use Secure cookies. A Turnstile widget bound to the public hostname will not validate
+against a raw LAN hostname.
 
 ### Cloudflare Turnstile
 
-1. In the Cloudflare dashboard, create a Turnstile widget for hostname `dns.highrulez.com`.
+1. In the Cloudflare dashboard, create a Turnstile widget for your public application hostname
+   (example: `ddns.example.com`).
 2. Mode: Managed. Theme: dark. Appearance: interaction-only (where supported). Action: `login`.
 3. Set in `.env` (never commit real secrets):
 
 ```env
-TURNSTILE_SITE_KEY=...
-TURNSTILE_SECRET_KEY=...
-TURNSTILE_EXPECTED_HOSTNAME=dns.highrulez.com
+TURNSTILE_SITE_KEY=YOUR_TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY=YOUR_TURNSTILE_SECRET_KEY
+TURNSTILE_EXPECTED_HOSTNAME=ddns.example.com
 TURNSTILE_EXPECTED_ACTION=login
 ```
 
-4. Redeploy the app container so compose injects the Turnstile env vars.
-5. Apply the MariaDB migration for authentication audit events (`AuthAuditEvent`) via the normal
+4. Redeploy the app container so Compose injects the Turnstile env vars.
+5. Apply pending MariaDB migrations (including authentication audit events) via the normal
    deploy/migrate path before relying on audit persistence.
 
 To include release metadata in the System page, set these values before rebuilding:
@@ -139,7 +157,7 @@ docker compose restart app
 The authenticated **System** page includes read-only MariaDB migration status, Cloudflare
 connectivity, scheduler state, on-demand infrastructure self-tests, and sanitized recent logs. Logs
 shown there are held in memory and reset when the container restarts. Diagnostics never include API
-tokens, passwords, cookies, session/encryption secrets, or `DATABASE_URL`.
+tokens, passwords, cookies, session/encryption secrets, Turnstile secrets, or `DATABASE_URL`.
 
 ## Verify host-network IPv4 and IPv6
 
@@ -159,5 +177,5 @@ MariaDB continues running.
 ## Backup
 
 Back up the existing MariaDB database through your normal Synology database backup process, and
-back up `.env`. Test restoration periodically. The encryption and session secrets are required
-alongside the database.
+back up `.env`. Test restoration periodically. The encryption, session, and Turnstile secrets are
+required alongside the database.

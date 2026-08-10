@@ -17,6 +17,7 @@ and records every result in MariaDB.
 - Authenticated System dashboard for Synology, Docker, MariaDB, Cloudflare, DDNS, proxy diagnostics,
   self-tests, and sanitized in-memory logs
 - Local Argon2 administrator login with MariaDB-backed HttpOnly sessions
+- Cloudflare Turnstile on login, login rate limiting, session hardening, and authentication audit events
 - Responsive React dashboard
 
 ## Requirements
@@ -24,8 +25,25 @@ and records every result in MariaDB.
 - Synology DSM Container Manager or Docker Engine with Compose v2
 - An existing Synology MariaDB 10 database and non-root application user reachable over TCP
 - A Cloudflare API token
+- A Cloudflare Turnstile widget for your public application hostname
 - Port `8090` available on the Synology host
 - At least 512 MB free memory for the application container
+
+## Documentation-safe examples
+
+Examples in this repository use reserved documentation values. Replace every placeholder with your
+own values before deploying. Do not copy another operator’s production `.env`.
+
+| Purpose | Example placeholder | Replace with |
+| --- | --- | --- |
+| Public application URL | `https://ddns.example.com` | Your HTTPS hostname served by Synology Reverse Proxy |
+| LAN diagnostics URL | `http://192.0.2.10:8090` | Your NAS LAN IP and app port |
+| Example DNS zone | `example.com` | A Cloudflare zone you control |
+| Example subdomains | `nas.example.com`, `vpn.example.com`, `home.example.com` | Hostnames you choose to manage |
+| Example public IPv4 | `203.0.113.10` | Detected automatically in normal operation |
+| Example public IPv6 | `2001:db8::10` | Detected automatically when IPv6 is enabled |
+| Database name | `infrahub` | Your MariaDB database name |
+| Database user | `ddns_app` | Your non-root MariaDB user |
 
 ## Quick start
 
@@ -36,18 +54,28 @@ and records every result in MariaDB.
    cp .env.example .env
    ```
 
-3. Set `DATABASE_URL` for the existing Synology MariaDB database, plus `APP_ORIGIN`,
-   `ENCRYPTION_KEY`, and `SESSION_SECRET`.
+3. Edit `.env` and replace every placeholder. At minimum set:
+
+   - `APP_ORIGIN`
+   - `APP_ALLOWED_ORIGINS`
+   - `DATABASE_URL`
+   - `ENCRYPTION_KEY`
+   - `SESSION_SECRET`
+   - `TURNSTILE_SITE_KEY`
+   - `TURNSTILE_SECRET_KEY`
+   - `TURNSTILE_EXPECTED_HOSTNAME`
+
+   Generate secrets locally:
 
    ```sh
    node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
    node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
    ```
 
-4. Preserve the verified native MariaDB address in `DATABASE_URL`. Host networking makes
-   `127.0.0.1` refer to the Synology host, but do not change a working LAN-address connection until
-   MariaDB TCP binding and user grants have been verified. Synology MariaDB 10 commonly uses port
-   `3307`. URL-encode reserved characters in the database password.
+4. Preserve a verified MariaDB address in `DATABASE_URL`. With host networking, `127.0.0.1` refers to
+   the Synology host, but do not change a working connection until MariaDB TCP binding and user
+   grants have been verified. Confirm the MariaDB TCP port used by your NAS. URL-encode reserved
+   characters in the database password.
 5. Build and start:
 
    ```sh
@@ -55,38 +83,73 @@ and records every result in MariaDB.
    docker compose up -d
    ```
 
-6. Configure Synology Reverse Proxy for `https://dns.highrulez.com` to
-   `http://127.0.0.1:8090`, then open the HTTPS URL and complete setup.
+6. Configure Synology Reverse Proxy so your public hostname (for example `https://ddns.example.com`)
+   forwards to `http://127.0.0.1:8090`, then open the HTTPS URL and complete setup.
 
 Compose starts only the application container. It does not install, create, initialize, start,
 stop, or back up MariaDB.
 
+Detailed Synology steps: [docs/synology.md](docs/synology.md).
+
 ## Environment variables
 
-Important values:
+Important values (examples only — replace with your own):
 
-- `APP_HOST`: Fastify bind address, fixed to `0.0.0.0` by Compose
-- `APP_PORT`: Fastify host-network port, fixed to `8090` by Compose
-- `APP_ORIGIN`: canonical public browser origin, `https://dns.highrulez.com`
-- `APP_ALLOWED_ORIGINS`: comma-separated exact browser origins permitted for mutating
-  requests, for example
-  `https://dns.highrulez.com,http://192.168.68.100:8090`
-- `DATABASE_URL`: complete URL for the existing Synology MariaDB database, such as
-  `mysql://cloudflare_ddns:encoded-password@192.168.1.10:3307/cloudflare_ddns`
-- `ENCRYPTION_KEY`: canonical base64 for exactly 32 random bytes; encrypts API tokens
-- `SESSION_SECRET`: at least 32 random characters; protects opaque session-token hashes
-- `COOKIE_SECURE`: keep `true` when the dashboard is served over HTTPS
-- `TZ`: defaults to `Asia/Kuala_Lumpur`
+```env
+APP_ORIGIN=https://ddns.example.com
+APP_ALLOWED_ORIGINS=https://ddns.example.com,http://192.0.2.10:8090
+APP_PORT=8090
+DATABASE_URL=mysql://ddns_app:CHANGE_ME@127.0.0.1:3306/infrahub
+TURNSTILE_SITE_KEY=YOUR_TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY=YOUR_TURNSTILE_SECRET_KEY
+TURNSTILE_EXPECTED_HOSTNAME=ddns.example.com
+TURNSTILE_EXPECTED_ACTION=login
+ENCRYPTION_KEY=GENERATE_YOUR_OWN_KEY
+SESSION_SECRET=GENERATE_YOUR_OWN_SECRET
+COOKIE_SECURE=true
+TZ=UTC
+```
+
+| Variable | Purpose |
+| --- | --- |
+| `APP_HOST` | Fastify bind address; Compose sets `0.0.0.0` |
+| `APP_PORT` | Host-network listen port; Compose sets `8090` |
+| `APP_ORIGIN` | Canonical public browser origin (HTTPS in production) |
+| `APP_ALLOWED_ORIGINS` | Exact comma-separated browser origins allowed for mutating requests |
+| `DATABASE_URL` | Existing Synology MariaDB URL for your app user and database |
+| `ENCRYPTION_KEY` | Canonical base64 for exactly 32 random bytes; encrypts API tokens |
+| `SESSION_SECRET` | At least 32 random characters; protects opaque session-token hashes |
+| `COOKIE_SECURE` | Keep `true` when the dashboard is served over HTTPS |
+| `TURNSTILE_SITE_KEY` | Public Turnstile site key |
+| `TURNSTILE_SECRET_KEY` | Server-only Turnstile secret; never expose to the browser or commit it |
+| `TURNSTILE_EXPECTED_HOSTNAME` | Hostname Turnstile Siteverify must return (your public app host) |
+| `TURNSTILE_EXPECTED_ACTION` | Must match the widget action; production default is `login` |
+| `TZ` | Container timezone for display; defaults to `UTC` in examples |
 
 Never commit `.env`. Losing `ENCRYPTION_KEY` makes stored Cloudflare tokens unrecoverable.
 
-Fastify trusts Synology's forwarded protocol, host, port, and client-address headers from
-loopback only. Origin validation uses an exact allowlist from `APP_ALLOWED_ORIGINS` plus
-`APP_ORIGIN`. Absolute public-origin reporting continues to use `APP_ORIGIN`.
+Fastify trusts Synology's forwarded protocol, host, port, and client-address headers from loopback
+only. Origin validation uses an exact allowlist from `APP_ALLOWED_ORIGINS` plus `APP_ORIGIN`.
 
-When `COOKIE_SECURE=true`, Secure session cookies are still emitted for HTTPS production
-requests. Direct HTTP LAN access can authenticate with a non-Secure cookie scoped to that
-HTTP origin only. Do not set `COOKIE_SECURE=false` for production HTTPS.
+When `COOKIE_SECURE=true`, Secure session cookies are still emitted for HTTPS production requests.
+Direct HTTP LAN access may receive a non-Secure cookie scoped to that HTTP origin only. Do not set
+`COOKIE_SECURE=false` globally just to make LAN HTTP login work.
+
+Authenticated production administration should use your HTTPS hostname. Keep direct `:8090` access
+primarily for diagnostics and health checks. Do not disable Turnstile or weaken hostname validation
+for raw LAN IP access.
+
+## Cloudflare Turnstile
+
+1. In the Cloudflare dashboard, create a Turnstile widget for your public application hostname
+   (example: `ddns.example.com`).
+2. Use Managed mode. Dark theme and interaction-only appearance are recommended where supported.
+3. Set the widget action to `login`.
+4. Put the site key and secret key into `.env`. Production startup fails closed if they are missing.
+5. Set `TURNSTILE_EXPECTED_HOSTNAME` to the same public hostname.
+
+Automated/local tests should use Cloudflare’s official Turnstile test keys. Never call your
+production Turnstile secret from CI.
 
 ## Cloudflare API token
 
@@ -141,8 +204,10 @@ errors are not retried.
 ## Health
 
 ```sh
-curl -fsS http://SYNOLOGY-IP:8090/api/health
+curl -fsS http://192.0.2.10:8090/api/health
 ```
+
+Replace `192.0.2.10` with your NAS LAN address.
 
 The public endpoint reports only liveness/readiness status and a timestamp. Docker uses the same
 minimal endpoint. Detailed database, scheduler, network, and provider information is available only
@@ -151,14 +216,15 @@ on the authenticated System page.
 The authenticated **System** page auto-refreshes every 30 seconds. It provides infrastructure
 status, on-demand self-tests, and a sanitized diagnostics report. Recent logs are held only in
 container memory and are cleared on restart. API tokens, passwords, cookies, encryption material,
-session secrets, and the database URL are excluded from log and diagnostics responses.
+session secrets, Turnstile secrets, and the database URL are excluded from log and diagnostics
+responses.
 
 ## Backups
 
 Back up:
 
 - The existing MariaDB database using your normal Synology database backup procedure
-- `.env`, especially `ENCRYPTION_KEY` and `SESSION_SECRET`
+- `.env`, especially `ENCRYPTION_KEY`, `SESSION_SECRET`, and Turnstile secrets
 
 Protect backups as secrets. A database dump without `ENCRYPTION_KEY` cannot decrypt API tokens.
 
@@ -181,6 +247,8 @@ migrations before startup. It never creates a MariaDB server, database, or datab
   used.
 - **Origin rejected:** make `APP_ORIGIN` and `APP_ALLOWED_ORIGINS` include the exact browser
   scheme, host, and port being used.
+- **Turnstile failed:** confirm the widget hostname matches `TURNSTILE_EXPECTED_HOSTNAME`, the
+  action is `login`, and you are signing in through the public HTTPS hostname.
 - **Database access denied:** verify the existing database, application user grants, TCP access, and
   URL-encoded `DATABASE_URL`.
 - **Token rejected:** confirm Bearer token permissions and zone-resource restrictions.
@@ -208,4 +276,4 @@ corepack pnpm test
 corepack pnpm build
 ```
 
-Database timestamps are stored in UTC and displayed in `Asia/Kuala_Lumpur` by default.
+Database timestamps are stored in UTC and displayed using the container `TZ` setting.

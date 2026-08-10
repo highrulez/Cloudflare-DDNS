@@ -8,8 +8,8 @@ export const testConfig = {
   NODE_ENV: 'test',
   APP_HOST: '127.0.0.1',
   APP_PORT: 8090,
-  APP_ORIGIN: 'https://dns.highrulez.com',
-  APP_ALLOWED_ORIGINS: ['https://dns.highrulez.com', 'http://192.168.68.100:8090'],
+  APP_ORIGIN: 'https://ddns.example.com',
+  APP_ALLOWED_ORIGINS: ['https://ddns.example.com', 'http://192.0.2.10:8090'],
   DATABASE_URL: 'mysql://user:password@127.0.0.1:3307/ddns',
   SESSION_SECRET: 'a-session-secret-that-is-longer-than-32-characters',
   ENCRYPTION_KEY: Buffer.alloc(32),
@@ -22,7 +22,7 @@ export const testConfig = {
   HTTP_TIMEOUT_MS: 5000,
   TURNSTILE_SITE_KEY: TURNSTILE_TEST_SITE_KEY,
   TURNSTILE_SECRET_KEY: TURNSTILE_TEST_SECRET_KEY,
-  TURNSTILE_EXPECTED_HOSTNAME: 'dns.highrulez.com',
+  TURNSTILE_EXPECTED_HOSTNAME: 'ddns.example.com',
   TURNSTILE_EXPECTED_ACTION: 'login',
   TURNSTILE_VERIFY_TIMEOUT_MS: 5000
 } satisfies Config;

@@ -8,8 +8,8 @@ const baseConfig = {
   NODE_ENV: 'test',
   APP_HOST: '0.0.0.0',
   APP_PORT: 8090,
-  APP_ORIGIN: 'https://dns.highrulez.com',
-  APP_ALLOWED_ORIGINS: ['https://dns.highrulez.com', 'http://192.168.68.100:8090'],
+  APP_ORIGIN: 'https://ddns.example.com',
+  APP_ALLOWED_ORIGINS: ['https://ddns.example.com', 'http://192.0.2.10:8090'],
   DATABASE_URL: 'mysql://user:password@127.0.0.1:3307/ddns',
   SESSION_SECRET: 'a-session-secret-that-is-longer-than-32-characters',
   ENCRYPTION_KEY: Buffer.alloc(32),
@@ -20,7 +20,7 @@ const baseConfig = {
   IPV4_PROVIDERS: ['https://api4.ipify.org'],
   IPV6_PROVIDERS: ['https://api6.ipify.org'],
   HTTP_TIMEOUT_MS: 5000,
-  TURNSTILE_EXPECTED_HOSTNAME: 'dns.highrulez.com',
+  TURNSTILE_EXPECTED_HOSTNAME: 'ddns.example.com',
   TURNSTILE_EXPECTED_ACTION: 'login',
   TURNSTILE_VERIFY_TIMEOUT_MS: 5000
 } satisfies Config;
@@ -32,13 +32,13 @@ describe('allowed origins', () => {
       DATABASE_URL: 'mysql://user:password@127.0.0.1:3307/ddns',
       SESSION_SECRET: 'a-session-secret-that-is-longer-than-32-characters',
       ENCRYPTION_KEY: Buffer.alloc(32).toString('base64'),
-      APP_ORIGIN: 'https://dns.highrulez.com',
-      APP_ALLOWED_ORIGINS: 'https://dns.highrulez.com, http://192.168.68.100:8090 ',
+      APP_ORIGIN: 'https://ddns.example.com',
+      APP_ALLOWED_ORIGINS: 'https://ddns.example.com, http://192.0.2.10:8090 ',
       COOKIE_SECURE: 'true'
     });
     expect([...resolveAllowedOrigins(config)].sort()).toEqual([
-      'http://192.168.68.100:8090',
-      'https://dns.highrulez.com'
+      'http://192.0.2.10:8090',
+      'https://ddns.example.com'
     ]);
   });
 
@@ -49,14 +49,14 @@ describe('allowed origins', () => {
     const production = await app.inject({
       method: 'POST',
       url: '/api/auth/logout',
-      headers: { origin: 'https://dns.highrulez.com' }
+      headers: { origin: 'https://ddns.example.com' }
     });
     expect(production.statusCode).not.toBe(403);
 
     const lan = await app.inject({
       method: 'POST',
       url: '/api/auth/logout',
-      headers: { origin: 'http://192.168.68.100:8090' }
+      headers: { origin: 'http://192.0.2.10:8090' }
     });
     expect(lan.statusCode).not.toBe(403);
 
@@ -71,7 +71,7 @@ describe('allowed origins', () => {
     const wildcardLike = await app.inject({
       method: 'POST',
       url: '/api/auth/logout',
-      headers: { origin: 'https://app.highrulez.com' }
+      headers: { origin: 'https://app.example.com' }
     });
     expect(wildcardLike.statusCode).toBe(403);
 
@@ -92,9 +92,9 @@ describe('allowed origins', () => {
       url: '/test-cookie',
       remoteAddress: '127.0.0.1',
       headers: {
-        origin: 'https://dns.highrulez.com',
+        origin: 'https://ddns.example.com',
         'x-forwarded-proto': 'https',
-        'x-forwarded-host': 'dns.highrulez.com'
+        'x-forwarded-host': 'ddns.example.com'
       }
     });
     expect(httpsCookie.json().secure).toBe(true);
@@ -105,10 +105,10 @@ describe('allowed origins', () => {
     const lanCookie = await app.inject({
       method: 'POST',
       url: '/test-cookie',
-      remoteAddress: '192.168.68.50',
+      remoteAddress: '192.0.2.50',
       headers: {
-        origin: 'http://192.168.68.100:8090',
-        host: '192.168.68.100:8090'
+        origin: 'http://192.0.2.10:8090',
+        host: '192.0.2.10:8090'
       }
     });
     expect(lanCookie.json().secure).toBe(false);
