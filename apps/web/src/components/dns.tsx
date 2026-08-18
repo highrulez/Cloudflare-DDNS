@@ -86,6 +86,17 @@ export function CreateDnsRecordDialog({
       : hostname.includes('.')
         ? hostname
         : `${hostname || 'subdomain'}.${zone.name}`;
+  const selectedAccount = accounts.find((account) => account.id === accountId);
+  const ipSourceLabel =
+    ipSource === 'CUSTOM'
+      ? 'Custom IP'
+      : type === 'A'
+        ? publicIp?.ipv4
+          ? `Detected public IPv4 (${publicIp.ipv4})`
+          : detectionStatusText(publicIp?.ipv4Status, 'IPv4')
+        : publicIp?.ipv6
+          ? `Detected public IPv6 (${publicIp.ipv6})`
+          : detectionStatusText(publicIp?.ipv6Status, 'IPv6');
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -145,7 +156,10 @@ export function CreateDnsRecordDialog({
         title="Add DNS Record"
         description="Create an A or AAAA record in Cloudflare and optionally manage it with DDNS."
       >
-        <form onSubmit={(event) => void submit(event)} className="grid gap-4 sm:grid-cols-2">
+        <form
+          onSubmit={(event) => void submit(event)}
+          className="grid min-w-0 grid-cols-1 gap-4 overflow-x-hidden sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] [&>*]:min-w-0"
+        >
           {error && (
             <div
               role="alert"
@@ -157,6 +171,7 @@ export function CreateDnsRecordDialog({
           <SelectField
             label="Cloudflare account"
             value={accountId}
+            title={selectedAccount?.name}
             onChange={(event) => {
               const next = event.target.value;
               setAccountId(next);
@@ -173,6 +188,7 @@ export function CreateDnsRecordDialog({
           <SelectField
             label="Zone"
             value={zoneId}
+            title={zone?.name}
             onChange={(event) => setZoneId(event.target.value)}
             required
           >
@@ -206,6 +222,7 @@ export function CreateDnsRecordDialog({
           <SelectField
             label="IP source"
             value={ipSource}
+            title={ipSourceLabel}
             onChange={(event) => setIpSource(event.target.value as CreateDnsRecord['ipSource'])}
           >
             {type === 'A' && (

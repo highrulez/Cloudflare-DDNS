@@ -63,7 +63,7 @@ export function Field({
   return (
     <label
       htmlFor={id}
-      className="grid gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200"
+      className="grid min-w-0 w-full gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200"
     >
       {label}
       <input
@@ -71,7 +71,7 @@ export function Field({
         aria-invalid={!!error}
         aria-describedby={hint || error ? `${id}-help` : undefined}
         className={cx(
-          'h-11 rounded-lg border border-slate-300 bg-white px-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-white/10 dark:bg-console-950 dark:text-white',
+          'h-11 min-w-0 w-full max-w-full rounded-lg border border-slate-300 bg-white px-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-white/10 dark:bg-console-950 dark:text-white',
           error && 'border-red-500',
           className
         )}
@@ -149,18 +149,22 @@ export function PasswordField({
 export function SelectField({
   label,
   children,
+  className,
   ...props
 }: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string }) {
   const id = useId();
   return (
     <label
       htmlFor={id}
-      className="grid gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200"
+      className="grid min-w-0 w-full gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-200"
     >
       {label}
       <select
         id={id}
-        className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-white/10 dark:bg-console-950 dark:text-white"
+        className={cx(
+          'h-11 min-w-0 w-full max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded-lg border border-slate-300 bg-white py-2 pl-3 pr-8 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-accent focus:ring-2 focus:ring-accent/20 dark:border-white/10 dark:bg-console-950 dark:text-white',
+          className
+        )}
         {...props}
       >
         {children}
