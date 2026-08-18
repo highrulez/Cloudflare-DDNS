@@ -4,6 +4,9 @@ A self-hosted Cloudflare Dynamic DNS dashboard for Synology DSM and Docker. It d
 IPv4/IPv6 addresses, compares them with managed Cloudflare records, updates only changed records,
 and records every result in MariaDB.
 
+**Current release:** [v1.0.0](https://github.com/highrulez/Cloudflare-DDNS/releases/tag/v1.0.0).
+See [CHANGELOG.md](CHANGELOG.md) for the full release notes.
+
 ## Features
 
 - First-run setup wizard; no JSON/YAML editing after deployment
